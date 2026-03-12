@@ -82,9 +82,11 @@ const Domain1_Architecture = () => {
       {activeTab === 'architecture' && <ArchitectureTab />}
       {activeTab === 'interfaces'   && <InterfacesTab />}
       {activeTab === 'objects'      && <ObjectsTab />}
+      {activeTab === 'warehouses'   && <WarehousesTab />}
       {activeTab === 'storage'      && <StorageTab />}
+      {activeTab === 'aiml'         && <AIMLTab />}
       {activeTab === 'quiz'         && <QuizTab />}
-      {!['architecture','interfaces','objects','storage','quiz'].includes(activeTab) &&
+      {!['architecture','interfaces','objects','warehouses','storage','aiml','quiz'].includes(activeTab) &&
         <ComingSoon tab={TABS.find(t => t.id === activeTab)?.label} />}
     </div>
   );
@@ -1175,7 +1177,1062 @@ SELECT
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// LEARNING TAB 4 — 1.5 Storage Concepts
+// ═══════════════════════════════════════════════════════════════════════════════
+// LEARNING TAB 4 — 1.4 Virtual Warehouses
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const WH_SIZES = [
+  { size: 'X-Small', credits: 1,   alias: 'XS', note: 'Default in SQL. Good for UI queries, small ad-hoc.' },
+  { size: 'Small',   credits: 2,   alias: 'S',  note: 'Light dev/test workloads.' },
+  { size: 'Medium',  credits: 4,   alias: 'M',  note: 'Standard ETL / moderate queries.' },
+  { size: 'Large',   credits: 8,   alias: 'L',  note: 'Complex queries, moderate data loads.' },
+  { size: 'X-Large', credits: 16,  alias: 'XL', note: 'Default in Snowsight UI. Large-scale production queries.' },
+  { size: '2X-Large',credits: 32,  alias: '2XL',note: 'Heavy analytical workloads.' },
+  { size: '3X-Large',credits: 64,  alias: '3XL',note: 'Very large data transformations.' },
+  { size: '4X-Large',credits: 128, alias: '4XL',note: 'Massive batch jobs, ML training.' },
+  { size: '5X-Large',credits: 256, alias: '5XL',note: 'GA on AWS & Azure. Extreme workloads.' },
+  { size: '6X-Large',credits: 512, alias: '6XL',note: 'GA on AWS & Azure. Maximum compute.' },
+];
+
+const WH_TYPES_DATA = [
+  {
+    id: 'standard',
+    emoji: '⚙️', label: 'Standard (Gen1 & Gen2)',
+    badge: 'Default', badgeColor: 'bg-blue-600',
+    color: 'bg-blue-50 border-blue-200', text: 'text-blue-900',
+    when: 'SQL queries, DML, data loading/unloading, BI reporting, most general workloads.',
+    gen2note: 'Gen2 warehouses deliver higher performance per credit for the same size. Not yet default or available in all regions.',
+    keyFacts: [
+      'Supports all SQL operations: SELECT, DML, COPY INTO',
+      'Per-second billing with 60-second minimum per resume',
+      'Cache (local SSD) is dropped when warehouse suspends',
+      'Multi-cluster available at Enterprise edition+',
+    ],
+    code: `CREATE WAREHOUSE analytics_wh
+  WAREHOUSE_SIZE   = 'LARGE'
+  WAREHOUSE_TYPE   = 'STANDARD'   -- default, can omit
+  AUTO_SUSPEND     = 300          -- seconds (5 min)
+  AUTO_RESUME      = TRUE
+  MIN_CLUSTER_COUNT = 1
+  MAX_CLUSTER_COUNT = 3           -- Enterprise+ feature
+  SCALING_POLICY   = 'STANDARD';  -- or 'ECONOMY'`,
+  },
+  {
+    id: 'snowpark',
+    emoji: '🧠', label: 'Snowpark-Optimized',
+    badge: 'ML / High-memory', badgeColor: 'bg-violet-600',
+    color: 'bg-violet-50 border-violet-200', text: 'text-violet-900',
+    when: 'ML model training, large Snowpark Python/Java/Scala workloads that need high memory per node.',
+    gen2note: 'Provides 16× more memory per node vs standard by default. Can be configured up to 1 TB (preview on AWS).',
+    keyFacts: [
+      'Default: 16× memory per node (MEMORY_16X)',
+      'Can scale to 256 GB (MEMORY_16X) or 1 TB (MEMORY_64X preview)',
+      'Supports CPU architecture selection (default or x86)',
+      'Takes longer to start than standard warehouses',
+      'NOT beneficial for regular SQL queries',
+    ],
+    code: `-- Basic Snowpark-optimized warehouse
+CREATE WAREHOUSE snowpark_wh
+  WAREHOUSE_SIZE   = 'MEDIUM'
+  WAREHOUSE_TYPE   = 'SNOWPARK-OPTIMIZED';
+
+-- High-memory variant (256 GB, x86)
+CREATE WAREHOUSE ml_training_wh
+  WAREHOUSE_SIZE      = 'LARGE'
+  WAREHOUSE_TYPE      = 'SNOWPARK-OPTIMIZED'
+  RESOURCE_CONSTRAINT = 'MEMORY_16X_X86';
+
+-- Change memory profile on existing WH
+ALTER WAREHOUSE ml_training_wh
+  SET RESOURCE_CONSTRAINT = 'MEMORY_1X';`,
+  },
+];
+
+const SCALING_MODES = [
+  {
+    id: 'up',
+    emoji: '⬆️', label: 'Scale UP (Resize)',
+    color: 'bg-blue-50 border-blue-200', text: 'text-blue-800',
+    when: 'Queries are slow. Complex queries, large data transformations, ML training.',
+    howto: 'Increase warehouse size (e.g. Medium → X-Large). Can be done while warehouse is running.',
+    caveat: 'Resizing adds compute but does NOT impact already-running queries. New size applies to queued + future queries.',
+    code: `-- Scale up while running (takes effect for new/queued queries)
+ALTER WAREHOUSE analytics_wh
+  SET WAREHOUSE_SIZE = 'X-LARGE';
+
+-- Scale back down after heavy workload completes
+ALTER WAREHOUSE analytics_wh
+  SET WAREHOUSE_SIZE = 'MEDIUM';`,
+  },
+  {
+    id: 'down',
+    emoji: '⬇️', label: 'Scale DOWN (Right-size)',
+    color: 'bg-teal-50 border-teal-200', text: 'text-teal-800',
+    when: 'Workload is lighter than expected or you want to save credits.',
+    howto: 'Decrease warehouse size. Removing compute resources drops associated cache — expect initial slowdown.',
+    caveat: 'Cache is partially dropped when scaling down a running warehouse. Trade-off: credits vs cache warmth.',
+    code: `ALTER WAREHOUSE analytics_wh
+  SET WAREHOUSE_SIZE = 'SMALL';
+-- Note: cache for removed nodes is dropped immediately`,
+  },
+  {
+    id: 'out',
+    emoji: '↔️', label: 'Scale OUT (Multi-cluster)',
+    color: 'bg-violet-50 border-violet-200', text: 'text-violet-800',
+    when: 'Many concurrent users/queries are queuing. High concurrency problem. Enterprise edition required.',
+    howto: 'Increase MAX_CLUSTER_COUNT. Use Auto-scale mode so Snowflake starts/stops clusters automatically.',
+    caveat: 'Multi-cluster does NOT fix slow individual queries — use scale-UP for that. Designed purely for concurrency.',
+    code: `-- Auto-scale: min=1, max=5 clusters
+CREATE WAREHOUSE concurrent_wh
+  WAREHOUSE_SIZE    = 'MEDIUM'
+  MIN_CLUSTER_COUNT = 1
+  MAX_CLUSTER_COUNT = 5
+  SCALING_POLICY    = 'STANDARD';
+
+-- Maximized: always run 3 clusters
+ALTER WAREHOUSE concurrent_wh
+  SET MIN_CLUSTER_COUNT = 3
+      MAX_CLUSTER_COUNT = 3;`,
+  },
+  {
+    id: 'in',
+    emoji: '↩️', label: 'Scale IN (Reduce clusters)',
+    color: 'bg-amber-50 border-amber-200', text: 'text-amber-800',
+    when: 'Off-peak period. Want to reduce credit spend on a multi-cluster warehouse.',
+    howto: 'In Auto-scale mode, Snowflake handles this automatically. In Maximized mode, lower MIN/MAX.',
+    caveat: 'In Auto-scale, idle clusters shut down after SCALING_POLICY conditions are met (not instantly).',
+    code: `-- Economy policy: conserves credits, tolerates queuing
+ALTER WAREHOUSE concurrent_wh
+  SET SCALING_POLICY = 'ECONOMY';
+
+-- Reduce max clusters during off-peak
+ALTER WAREHOUSE concurrent_wh
+  SET MAX_CLUSTER_COUNT = 2;`,
+  },
+];
+
+const USE_CASES_DATA = [
+  {
+    id: 'adhoc',
+    emoji: '🔍', label: 'Ad-hoc / Interactive Queries',
+    color: 'bg-blue-50 border-blue-200', text: 'text-blue-800',
+    recs: [
+      { label: 'Size',          val: 'X-Small to Medium — start small, upsize if slow' },
+      { label: 'Auto-suspend',  val: '1–5 minutes (users are interactive, gaps are short)' },
+      { label: 'Auto-resume',   val: 'Enabled — users expect instant response' },
+      { label: 'Multi-cluster', val: 'If many concurrent analysts, enable auto-scale' },
+    ],
+    tip: 'Dedicated ad-hoc warehouse per team prevents BI workloads from starving exploratory queries.',
+    code: `CREATE WAREHOUSE adhoc_analysts_wh
+  WAREHOUSE_SIZE = 'MEDIUM'
+  AUTO_SUSPEND   = 120        -- 2 min: short gaps between queries
+  AUTO_RESUME    = TRUE;`,
+  },
+  {
+    id: 'loading',
+    emoji: '📥', label: 'Data Loading (ETL / ELT)',
+    color: 'bg-teal-50 border-teal-200', text: 'text-teal-800',
+    recs: [
+      { label: 'Size',          val: 'Small to Large — depends on FILE count, not data size' },
+      { label: 'Auto-suspend',  val: '5–10 minutes (batch jobs have gaps between runs)' },
+      { label: 'Auto-resume',   val: 'Enabled for Snowpipe; manual for scheduled batch' },
+      { label: 'Multi-cluster', val: 'Rarely needed — data loading does not benefit from scale-out' },
+    ],
+    tip: 'Larger warehouse ≠ faster loading. Splitting large files into many small files is more impactful than upsizing.',
+    code: `CREATE WAREHOUSE etl_loader_wh
+  WAREHOUSE_SIZE = 'LARGE'
+  AUTO_SUSPEND   = 300        -- 5 min: batch jobs may have gaps
+  AUTO_RESUME    = TRUE;
+
+-- COPY INTO is the load operation
+COPY INTO orders
+  FROM @my_stage
+  FILE_FORMAT = (FORMAT_NAME = 'my_csv_fmt')
+  ON_ERROR = 'CONTINUE';`,
+  },
+  {
+    id: 'bi',
+    emoji: '📊', label: 'BI & Reporting',
+    color: 'bg-amber-50 border-amber-200', text: 'text-amber-800',
+    recs: [
+      { label: 'Size',          val: 'Medium to X-Large — dashboards hit complex aggregation queries' },
+      { label: 'Auto-suspend',  val: '10–15 minutes (report runs may have moderate gaps)' },
+      { label: 'Auto-resume',   val: 'Enabled — report tools connect without human intervention' },
+      { label: 'Multi-cluster', val: 'Enable if many BI users hit dashboards simultaneously (peak hours)' },
+    ],
+    tip: 'Dedicated BI warehouse isolates report workloads from ETL. Prevents report delays during heavy transformation jobs.',
+    code: `CREATE WAREHOUSE bi_reporting_wh
+  WAREHOUSE_SIZE    = 'X-LARGE'
+  AUTO_SUSPEND      = 600         -- 10 min
+  AUTO_RESUME       = TRUE
+  MIN_CLUSTER_COUNT = 1
+  MAX_CLUSTER_COUNT = 4           -- handles peak dashboard concurrency
+  SCALING_POLICY    = 'STANDARD';`,
+  },
+  {
+    id: 'concurrent',
+    emoji: '👥', label: 'High Concurrency (Many Teams)',
+    color: 'bg-violet-50 border-violet-200', text: 'text-violet-800',
+    recs: [
+      { label: 'Isolation',     val: 'Separate warehouses per team — no resource contention' },
+      { label: 'Size',          val: 'Size per team\'s typical query complexity' },
+      { label: 'Multi-cluster', val: 'Per-team multi-cluster warehouse handles intra-team concurrency' },
+      { label: 'Scaling policy','val': 'Standard: minimize queuing. Economy: minimize credits.' },
+    ],
+    tip: 'Multiple warehouses share the SAME storage with ZERO contention. Cost is per-team compute, not shared storage.',
+    code: `-- Separate warehouses per department (best practice)
+CREATE WAREHOUSE finance_wh    WAREHOUSE_SIZE = 'MEDIUM' AUTO_SUSPEND = 300;
+CREATE WAREHOUSE marketing_wh  WAREHOUSE_SIZE = 'SMALL'  AUTO_SUSPEND = 120;
+CREATE WAREHOUSE data_eng_wh   WAREHOUSE_SIZE = 'X-LARGE' AUTO_SUSPEND = 600;
+
+-- Grant usage to each team's role
+GRANT USAGE ON WAREHOUSE finance_wh   TO ROLE finance_role;
+GRANT USAGE ON WAREHOUSE marketing_wh TO ROLE marketing_role;`,
+  },
+];
+
+const BILLING_FACTS = [
+  { emoji: '⏱️', fact: 'Per-second billing with a 60-second minimum each time the warehouse resumes.' },
+  { emoji: '💡', fact: 'Credits charged only while compute resources are running — suspended = $0.' },
+  { emoji: '📈', fact: 'Each size step doubles the credits/hour: X-Small=1, Small=2, Medium=4, Large=8 … 6X-Large=512.' },
+  { emoji: '🔄', fact: 'Resizing a suspended warehouse is free — new size provisions on next resume.' },
+  { emoji: '🔢', fact: 'Multi-cluster: credits = size credits × running clusters. E.g. Medium×3 clusters = 12 credits/hr.' },
+  { emoji: '🧊', fact: 'Warehouse cache is dropped on suspend. Resumed warehouse may run slower until cache warms up.' },
+];
+
+const WarehousesTab = () => {
+  const [openType,    setOpenType]    = useState(null);
+  const [openScale,   setOpenScale]   = useState(null);
+  const [openUseCase, setOpenUseCase] = useState(null);
+  const [sizeFilter,  setSizeFilter]  = useState(null);
+
+  return (
+    <div className="space-y-5">
+
+      {/* ── Warehouse Types ── */}
+      <InfoCard>
+        <SectionHeader icon={Server} color="bg-blue-600" title="Virtual Warehouse Types"
+          subtitle="Standard warehouses handle all SQL work. Snowpark-optimized warehouses are specialized for large-memory Python/ML jobs." />
+        <div className="space-y-3">
+          {WH_TYPES_DATA.map((wh, i) => (
+            <div key={wh.id} className={`rounded-xl border overflow-hidden ${wh.color}`}>
+              <button onClick={() => setOpenType(openType === i ? null : i)}
+                className="w-full flex items-center justify-between p-4 text-left">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{wh.emoji}</span>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`font-bold text-sm ${wh.text}`}>{wh.label}</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full text-white ${wh.badgeColor}`}>{wh.badge}</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">Use when: {wh.when.split('.')[0]}.</p>
+                  </div>
+                </div>
+                <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${openType === i ? 'rotate-90' : ''}`} />
+              </button>
+              {openType === i && (
+                <div className="px-5 pb-5 space-y-3">
+                  <div className={`rounded-lg p-3 bg-white/60 border border-white text-xs ${wh.text}`}>
+                    <p className="font-bold mb-1">💡 Gen note</p>
+                    <p>{wh.gen2note}</p>
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-2">
+                    {wh.keyFacts.map((f, j) => (
+                      <div key={j} className="flex items-start gap-2 bg-white/70 rounded-lg px-3 py-2 border border-white text-xs">
+                        <CheckCircle className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${wh.text}`} />
+                        <span className="text-slate-700">{f}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <CodeBlock code={wh.code} />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-xl p-3">
+          <p className="text-xs font-bold text-yellow-700 mb-1">⚡ Exam Tip — Types</p>
+          <ul className="text-xs text-yellow-700 space-y-1 list-disc pl-4">
+            <li>There are exactly <strong>two</strong> warehouse types: <strong>Standard</strong> and <strong>Snowpark-optimized</strong>.</li>
+            <li>Snowpark-optimized = large-memory ML training. Standard = everything else.</li>
+            <li>Gen2 standard warehouses offer better price/performance but are <strong>not the default yet</strong>.</li>
+          </ul>
+        </div>
+      </InfoCard>
+
+      {/* ── Warehouse Sizes ── */}
+      <InfoCard>
+        <SectionHeader icon={BarChart2} color="bg-blue-600" title="Warehouse Sizes & Credit Usage"
+          subtitle="10 sizes from X-Small (1 credit/hr) to 6X-Large (512 credits/hr). Each step doubles resources and cost." />
+        <div className="overflow-x-auto mb-3">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="bg-slate-100 text-slate-600">
+                <th className="text-left px-3 py-2 rounded-tl-lg font-semibold">Size</th>
+                <th className="text-right px-3 py-2 font-semibold">Credits/hr</th>
+                <th className="text-left px-3 py-2 rounded-tr-lg font-semibold">Typical use</th>
+              </tr>
+            </thead>
+            <tbody>
+              {WH_SIZES.map((s, i) => (
+                <tr key={s.size} onClick={() => setSizeFilter(sizeFilter === i ? null : i)}
+                  className={`border-t border-slate-100 cursor-pointer transition-colors ${
+                    sizeFilter === i ? 'bg-blue-50' : i % 2 === 0 ? 'bg-white hover:bg-slate-50' : 'bg-slate-50 hover:bg-blue-50/30'
+                  }`}>
+                  <td className="px-3 py-2 font-semibold text-slate-800">{s.size}</td>
+                  <td className="px-3 py-2 text-right">
+                    <span className="font-mono font-bold text-blue-700">{s.credits}</span>
+                  </td>
+                  <td className="px-3 py-2 text-slate-500">{s.note}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-3">
+          <p className="text-xs font-bold text-slate-600 mb-2">📐 Billing Formula</p>
+          <div className="grid sm:grid-cols-3 gap-2 text-xs">
+            {[
+              { label: 'Single-cluster',    formula: 'size_credits × hours_running' },
+              { label: 'Multi-cluster',     formula: 'size_credits × clusters_running × hours' },
+              { label: '60-sec minimum',    formula: 'Each resume = min 1 minute billed' },
+            ].map((f, i) => (
+              <div key={i} className="bg-white border border-slate-200 rounded-lg p-2">
+                <p className="font-bold text-slate-700 mb-0.5">{f.label}</p>
+                <code className="text-blue-700 font-mono text-[10px]">{f.formula}</code>
+              </div>
+            ))}
+          </div>
+        </div>
+        <CodeBlock code={`-- Create at a specific size
+CREATE WAREHOUSE prod_wh
+  WAREHOUSE_SIZE = 'X-LARGE'
+  AUTO_SUSPEND   = 300
+  AUTO_RESUME    = TRUE;
+
+-- Resize at any time (even while running)
+ALTER WAREHOUSE prod_wh SET WAREHOUSE_SIZE = 'LARGE';
+
+-- Suspend to stop credit consumption
+ALTER WAREHOUSE prod_wh SUSPEND;
+
+-- View all warehouses (size, state, clusters)
+SHOW WAREHOUSES;`} />
+        <div className="mt-3 bg-yellow-50 border border-yellow-200 rounded-xl p-3">
+          <p className="text-xs font-bold text-yellow-700 mb-1">⚡ Exam Tip — Billing</p>
+          <ul className="text-xs text-yellow-700 space-y-1 list-disc pl-4">
+            <li>Billing is <strong>per-second with a 60-second minimum</strong> each time the warehouse resumes.</li>
+            <li>Suspended warehouse = <strong>$0 compute cost</strong>. Storage cost continues regardless.</li>
+            <li>Larger warehouses help <strong>slow queries</strong>. They do <strong>NOT</strong> always improve data loading.</li>
+            <li>Credit usage <strong>doubles</strong> with each size increase (X-Small=1 → Small=2 → Medium=4 etc.).</li>
+          </ul>
+        </div>
+      </InfoCard>
+
+      {/* ── Scaling: Up vs Out ── */}
+      <InfoCard>
+        <SectionHeader icon={Zap} color="bg-blue-600" title="Scaling: Up vs Out"
+          subtitle="Scale UP (resize) to fix slow queries. Scale OUT (multi-cluster) to fix concurrency queuing." />
+
+        {/* Visual decision guide */}
+        <div className="grid sm:grid-cols-2 gap-3 mb-4">
+          <div className="bg-blue-50 border-2 border-blue-300 rounded-xl p-4">
+            <p className="font-bold text-blue-800 text-sm mb-2">⬆️ Scale UP — when queries are slow</p>
+            <ul className="text-xs text-blue-700 space-y-1 list-disc pl-4">
+              <li>Large, complex queries running too slowly</li>
+              <li>Expensive transformations / ML training</li>
+              <li>Resize warehouse (e.g. Medium → X-Large)</li>
+              <li>Can be done <strong>while warehouse is running</strong></li>
+            </ul>
+          </div>
+          <div className="bg-violet-50 border-2 border-violet-300 rounded-xl p-4">
+            <p className="font-bold text-violet-800 text-sm mb-2">↔️ Scale OUT — when queries are queuing</p>
+            <ul className="text-xs text-violet-700 space-y-1 list-disc pl-4">
+              <li>Many concurrent users / queries piling up</li>
+              <li>Peak hours, many teams on one warehouse</li>
+              <li>Multi-cluster warehouse (Enterprise+)</li>
+              <li>Auto-scale starts/stops clusters automatically</li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Multi-cluster detail */}
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4">
+          <p className="text-xs font-bold text-slate-700 mb-3">Multi-cluster Modes</p>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {[
+              {
+                label: 'Auto-scale Mode',
+                badge: 'Recommended',
+                badgeColor: 'bg-emerald-500',
+                desc: 'MIN < MAX. Snowflake starts clusters when queries queue, stops them when idle. Standard policy = minimize queuing. Economy policy = minimize credits.',
+                formula: 'MIN_CLUSTER_COUNT = 1\nMAX_CLUSTER_COUNT = 5',
+              },
+              {
+                label: 'Maximized Mode',
+                badge: 'All clusters always on',
+                badgeColor: 'bg-amber-500',
+                desc: 'MIN = MAX (both > 1). All clusters run continuously — maximum predictable capacity. Best for steady, large concurrency loads.',
+                formula: 'MIN_CLUSTER_COUNT = 3\nMAX_CLUSTER_COUNT = 3',
+              },
+            ].map((m, i) => (
+              <div key={i} className="bg-white border border-slate-200 rounded-xl p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="font-bold text-sm text-slate-800">{m.label}</span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full text-white ${m.badgeColor}`}>{m.badge}</span>
+                </div>
+                <p className="text-xs text-slate-600 mb-2">{m.desc}</p>
+                <code className="text-[10px] font-mono text-blue-700 bg-blue-50 px-2 py-1 rounded block whitespace-pre">{m.formula}</code>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          {SCALING_MODES.map((mode, i) => (
+            <div key={mode.id} className={`rounded-xl border overflow-hidden ${mode.color}`}>
+              <button onClick={() => setOpenScale(openScale === i ? null : i)}
+                className="w-full flex items-center justify-between p-3 text-left">
+                <span className={`font-bold text-sm flex items-center gap-2 ${mode.text}`}>
+                  <span className="text-lg">{mode.emoji}</span> {mode.label}
+                </span>
+                <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${openScale === i ? 'rotate-90' : ''}`} />
+              </button>
+              {openScale === i && (
+                <div className="px-4 pb-4 space-y-2">
+                  <div className="grid sm:grid-cols-3 gap-2 text-xs">
+                    {[
+                      { label: 'When',    val: mode.when },
+                      { label: 'How',     val: mode.howto },
+                      { label: '⚠️ Note', val: mode.caveat },
+                    ].map((item, j) => (
+                      <div key={j} className="bg-white/70 border border-white rounded-lg p-2">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{item.label}</p>
+                        <p className={`text-xs ${mode.text}`}>{item.val}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <CodeBlock code={mode.code} />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-xl p-3">
+          <p className="text-xs font-bold text-yellow-700 mb-1">⚡ Exam Tip — Scaling</p>
+          <ul className="text-xs text-yellow-700 space-y-1 list-disc pl-4">
+            <li>Slow queries → <strong>Scale UP</strong> (resize). Query queuing → <strong>Scale OUT</strong> (multi-cluster).</li>
+            <li>Multi-cluster requires <strong>Enterprise edition</strong> or higher.</li>
+            <li>Scaling policies: <strong>Standard</strong> = minimize queuing. <strong>Economy</strong> = minimize credits.</li>
+            <li>Resizing a running warehouse has <strong>no effect on currently running queries</strong> — only queued/new ones.</li>
+            <li>Data loading performance scales with <strong>number of files</strong>, not warehouse size.</li>
+          </ul>
+        </div>
+      </InfoCard>
+
+      {/* ── Use Cases & Best Practices ── */}
+      <InfoCard>
+        <SectionHeader icon={BookOpen} color="bg-blue-600" title="Workload-Based Configuration"
+          subtitle="The right warehouse config depends entirely on your workload type. Click each scenario to see the recommended approach." />
+        <div className="space-y-2 mb-4">
+          {USE_CASES_DATA.map((uc, i) => (
+            <div key={uc.id} className={`rounded-xl border overflow-hidden ${uc.color}`}>
+              <button onClick={() => setOpenUseCase(openUseCase === i ? null : i)}
+                className="w-full flex items-center justify-between p-4 text-left">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{uc.emoji}</span>
+                  <span className={`font-bold text-sm ${uc.text}`}>{uc.label}</span>
+                </div>
+                <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${openUseCase === i ? 'rotate-90' : ''}`} />
+              </button>
+              {openUseCase === i && (
+                <div className="px-5 pb-5 space-y-3">
+                  <div className="grid sm:grid-cols-2 gap-2">
+                    {uc.recs.map((r, j) => (
+                      <div key={j} className="bg-white/70 border border-white rounded-lg px-3 py-2 text-xs">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{r.label}</p>
+                        <p className={`font-semibold mt-0.5 ${uc.text}`}>{r.val}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className={`rounded-lg p-3 bg-white/60 border border-white text-xs ${uc.text}`}>
+                    <span className="font-bold">💡 </span>{uc.tip}
+                  </div>
+                  <CodeBlock code={uc.code} />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </InfoCard>
+
+      {/* ── Auto-Suspend & Auto-Resume ── */}
+      <InfoCard>
+        <SectionHeader icon={RefreshCw} color="bg-blue-600" title="Auto-Suspend & Auto-Resume"
+          subtitle="The primary cost-control levers. Suspend stops credit usage; resume restarts it on demand." />
+        <div className="grid sm:grid-cols-2 gap-3 mb-4">
+          {[
+            {
+              title: '💤 Auto-Suspend',
+              color: 'bg-slate-50 border-slate-200',
+              text: 'text-slate-800',
+              points: [
+                'Suspends the warehouse after N seconds of inactivity',
+                'Default: enabled. Set to 0 or NULL to disable (use cautiously)',
+                'Recommended: 1–10 min for interactive; 5–15 min for batch',
+                'Cache is DROPPED on suspend — trade off credits vs warmth',
+              ],
+            },
+            {
+              title: '▶️ Auto-Resume',
+              color: 'bg-blue-50 border-blue-200',
+              text: 'text-blue-800',
+              points: [
+                'Automatically resumes on any new statement submitted',
+                'Default: enabled. Disable to force manual control of costs',
+                'Resume typically takes 1–2 seconds (larger WH may take longer)',
+                'Each resume starts a new 60-second minimum billing period',
+              ],
+            },
+          ].map((card, i) => (
+            <div key={i} className={`rounded-xl border p-4 ${card.color}`}>
+              <p className={`font-bold text-sm mb-2 ${card.text}`}>{card.title}</p>
+              <ul className="space-y-1">
+                {card.points.map((p, j) => (
+                  <li key={j} className={`text-xs flex items-start gap-2 ${card.text}`}>
+                    <CheckCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 opacity-60" /> {p}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+        <CodeBlock code={`-- Best-practice warehouse with full config
+CREATE WAREHOUSE analytics_wh
+  WAREHOUSE_SIZE   = 'MEDIUM'
+  AUTO_SUSPEND     = 300       -- 5 minutes idle → suspend
+  AUTO_RESUME      = TRUE      -- wake up on any new query
+  INITIALLY_SUSPENDED = TRUE;  -- don't start billing on create
+
+-- Change auto-suspend on existing warehouse
+ALTER WAREHOUSE analytics_wh
+  SET AUTO_SUSPEND = 60;       -- aggressive: suspend after 1 min
+
+-- Disable auto-suspend (always-on) — use carefully!
+ALTER WAREHOUSE analytics_wh
+  SET AUTO_SUSPEND = 0;        -- NULL also works`} />
+
+        {/* Billing summary */}
+        <div className="mt-4 grid sm:grid-cols-3 gap-2">
+          {BILLING_FACTS.map((f, i) => (
+            <div key={i} className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-xs">
+              <span className="text-lg">{f.emoji}</span>
+              <p className="text-slate-600 mt-1 leading-relaxed">{f.fact}</p>
+            </div>
+          ))}
+        </div>
+      </InfoCard>
+
+      <ExamTip>
+        <p>Two types: <strong>Standard</strong> (all SQL work) and <strong>Snowpark-optimized</strong> (ML/high-memory Python). Multi-cluster = <strong>Enterprise+</strong>.</p>
+        <p>Scale <strong>UP</strong> (resize) for slow queries. Scale <strong>OUT</strong> (add clusters) for concurrency queuing. These solve different problems.</p>
+        <p>Data loading performance scales with <strong>file count</strong>, not warehouse size — use Small/Medium for loading.</p>
+        <p><strong>Economy</strong> scaling policy = prefer keeping clusters full (tolerate queuing, save credits). <strong>Standard</strong> = add clusters aggressively to prevent queuing.</p>
+        <p>Auto-suspend drops the local cache — consider the <strong>credits vs cache warmth</strong> tradeoff when setting the timeout.</p>
+      </ExamTip>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+// LEARNING TAB 6 — 1.6 AI/ML and Application Development Features
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const AIML_FEATURES = [
+  {
+    id: 'snowpark',
+    emoji: '🐍',
+    label: 'Snowpark',
+    badge: 'Compute pushdown library',
+    badgeColor: 'bg-blue-600',
+    color: 'bg-blue-50 border-blue-200',
+    text: 'text-blue-900',
+    what: 'Client library (Python, Java, Scala) for building data pipelines and ML workloads that push processing down to Snowflake — no data movement.',
+    keyFacts: [
+      'Languages: Python, Java, Scala',
+      'Core abstraction: DataFrame (lazy evaluation — no data moved until action called)',
+      'Pushes all transformations to Snowflake engine — compute stays in Snowflake',
+      'Can create UDFs and UDTFs inline in application code',
+      'Integrates with VS Code, Jupyter, IntelliJ',
+      'ML training → use Snowpark-optimized warehouse (MEMORY_16X+)',
+      'Pushdown includes UDFs — custom code runs server-side',
+    ],
+    useCases: 'Feature engineering, model training, ETL pipelines, batch scoring, inline UDF creation.',
+    code: `-- Snowpark Python: build a DataFrame pipeline (nothing runs yet)
+from snowflake.snowpark.functions import col, when
+
+session = Session.builder.configs(conn_params).create()
+
+df = session.table("sales")
+    .select(col("region"), col("amount"))
+    .filter(col("amount") > 1000)
+    .with_column("tier", when(col("amount") > 5000, "gold").otherwise("silver"))
+
+# Action: sends SQL to Snowflake, returns results
+results = df.collect()
+
+# Inline UDF — code pushed to server
+from snowflake.snowpark.types import IntegerType
+add_tax = udf(lambda x: x * 1.08,
+              return_type=FloatType(),
+              input_types=[FloatType()],
+              name="add_tax", replace=True)`,
+  },
+  {
+    id: 'notebooks',
+    emoji: '📓',
+    label: 'Snowflake Notebooks',
+    badge: 'Interactive dev environment',
+    badgeColor: 'bg-indigo-600',
+    color: 'bg-indigo-50 border-indigo-200',
+    text: 'text-indigo-900',
+    what: 'Jupyter-like environment built into Snowsight. Supports SQL, Python, and Markdown cells. Runs on warehouse or Container Runtime.',
+    keyFacts: [
+      'Available directly in Snowsight — no external setup',
+      'Supports SQL cells, Python cells, and Markdown',
+      'Two runtimes: Warehouse runtime & Container Runtime (Preview)',
+      'Container Runtime: pre-installed PyTorch, XGBoost, Scikit-learn, HuggingFace',
+      'Default notebook warehouse: SYSTEM$STREAMLIT_NOTEBOOK_WH (multi-cluster X-Small)',
+      'ML Jobs let external IDEs (VS Code, PyCharm) dispatch to Container Runtime',
+      'Seamlessly integrates with Snowpark and Snowflake ML',
+    ],
+    useCases: 'Exploratory data analysis, model prototyping, large-scale ML training, team data science collaboration.',
+    code: `-- SQL cell in a Notebook
+SELECT region, SUM(sales) AS total
+FROM orders
+GROUP BY region;
+
+# Python cell — Snowpark in notebook context
+import snowflake.snowpark.functions as F
+df = session.table("orders")
+df.group_by("region").agg(F.sum("sales").alias("total")).show()`,
+  },
+  {
+    id: 'streamlit',
+    emoji: '🖥️',
+    label: 'Streamlit in Snowflake (SiS)',
+    badge: 'Data app framework',
+    badgeColor: 'bg-pink-600',
+    color: 'bg-pink-50 border-pink-200',
+    text: 'text-pink-900',
+    what: 'Deploy Streamlit (open-source Python web app library) apps directly inside Snowflake. No external infrastructure needed — data never leaves Snowflake.',
+    keyFacts: [
+      'Snowflake manages compute and storage for the app',
+      'RBAC governs access — secured like any other Snowflake object',
+      'Can be created via Snowsight UI, SQL, or Snowflake CLI',
+      'Integrates with Snowpark, UDFs, stored procedures, Native App Framework',
+      'Two runtimes: Warehouse (default) and Container Runtime (Preview)',
+      'Default SiS notebook warehouse: SYSTEM$STREAMLIT_NOTEBOOK_WH',
+      'Can be shared via Snowflake Sharing mechanisms',
+    ],
+    useCases: 'Internal dashboards, self-service data tools, Cortex Analyst chat apps, ML model demos.',
+    code: `-- Create a Streamlit app via SQL
+CREATE OR REPLACE STREAMLIT my_dashboard
+  ROOT_LOCATION = '@my_stage/dashboard_app'
+  MAIN_FILE = 'app.py'
+  QUERY_WAREHOUSE = 'analytics_wh';
+
+-- Grant access
+GRANT USAGE ON STREAMLIT my_dashboard TO ROLE data_viewer;`,
+  },
+  {
+    id: 'cortex_ai',
+    emoji: '🧠',
+    label: 'Cortex AI Functions',
+    badge: 'SQL-callable LLM functions',
+    badgeColor: 'bg-violet-600',
+    color: 'bg-violet-50 border-violet-200',
+    text: 'text-violet-900',
+    what: 'SQL and Python functions that call industry-leading LLMs (Anthropic, Meta, Mistral, OpenAI) hosted inside Snowflake. No data leaves Snowflake.',
+    keyFacts: [
+      'AI_COMPLETE — generate text / completions with any supported LLM',
+      'AI_CLASSIFY — classify text or images into user-defined categories',
+      'AI_FILTER — TRUE/FALSE predicate in WHERE or JOIN clauses',
+      'AI_EXTRACT — extract structured info from text/documents',
+      'AI_SENTIMENT — sentiment score (-1 to 1)',
+      'AI_TRANSLATE — translate between languages',
+      'AI_SUMMARIZE_AGG / AI_AGG — aggregate summaries across rows',
+      'AI_EMBED (EMBED_TEXT_768/1024) — generate vector embeddings',
+      'Requires SNOWFLAKE.CORTEX_USER database role + USE AI FUNCTIONS privilege',
+      'Billed per token (input + output). Warehouse ≤ MEDIUM recommended.',
+    ],
+    useCases: 'Sentiment on reviews, NL to SQL, document extraction, content classification, vector search pipelines.',
+    code: `-- Text completion with a chosen model
+SELECT SNOWFLAKE.CORTEX.COMPLETE(
+  'mistral-large2',
+  'Summarize this customer feedback: ' || feedback_text
+) AS summary
+FROM customer_reviews;
+
+-- Classify rows (SQL)
+SELECT AI_CLASSIFY(review, ['positive','neutral','negative']) AS sentiment
+FROM reviews;
+
+-- Sentiment scoring
+SELECT AI_SENTIMENT(comment) AS score FROM tickets;
+
+-- Vector embeddings for similarity search
+SELECT AI_EMBED(description) AS embedding FROM products;`,
+  },
+  {
+    id: 'cortex_search',
+    emoji: '🔍',
+    label: 'Cortex Search',
+    badge: 'Hybrid vector + keyword search',
+    badgeColor: 'bg-teal-600',
+    color: 'bg-teal-50 border-teal-200',
+    text: 'text-teal-900',
+    what: 'Fully managed search service over Snowflake data. Uses hybrid retrieval (vector + keyword + semantic reranking) for high-quality fuzzy text search. Powers RAG pipelines.',
+    keyFacts: [
+      'Hybrid retrieval: vector search + keyword search + semantic reranking',
+      'No embedding/infra management required — fully serverless',
+      'CREATE CORTEX SEARCH SERVICE defines the source query and refresh',
+      'TARGET_LAG controls how often the index is refreshed from base data',
+      'Supports incremental refresh (same requirements as Dynamic Tables)',
+      'Primary keys enable optimized incremental refresh paths',
+      'Multi-index: search across multiple columns with different index types',
+      'Base table limit: 100M rows for optimal performance',
+      'Requires SNOWFLAKE.CORTEX_USER or CORTEX_EMBED_USER database role',
+    ],
+    useCases: 'RAG chatbots, enterprise search bars, document retrieval, customer support ticket search.',
+    code: `-- Create a search service on a text column
+CREATE OR REPLACE CORTEX SEARCH SERVICE support_search
+  ON transcript_text
+  ATTRIBUTES region, agent_id
+  WAREHOUSE = search_wh
+  TARGET_LAG = '1 hour'
+  AS (
+    SELECT transcript_text, region, agent_id
+    FROM support_transcripts
+  );
+
+-- Grant access
+GRANT USAGE ON CORTEX SEARCH SERVICE support_search TO ROLE analyst;
+
+-- Preview via SQL
+SELECT PARSE_JSON(
+  SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
+    'support_search',
+    '{"query":"internet issues","columns":["transcript_text"],"limit":3}'
+  )
+)['results'];`,
+  },
+  {
+    id: 'cortex_analyst',
+    emoji: '💬',
+    label: 'Cortex Analyst',
+    badge: 'Natural language → SQL',
+    badgeColor: 'bg-amber-600',
+    color: 'bg-amber-50 border-amber-200',
+    text: 'text-amber-900',
+    what: 'LLM-powered REST API that converts natural language business questions into accurate SQL queries against your Snowflake data. Uses Semantic Views (or YAML semantic model) to bridge business language and database schema.',
+    keyFacts: [
+      'REST API — integrates with Streamlit, Slack, Teams, any chat interface',
+      'Powered by state-of-the-art LLMs (Anthropic Claude, Mistral, Meta Llama)',
+      'Semantic Views (schema-level objects) define business metrics, dimensions, facts',
+      'Legacy: YAML semantic model stored on a stage is still supported',
+      'Multi-turn conversations supported — pass conversation history in messages[]',
+      'Does NOT train on customer data — data stays in Snowflake governance boundary',
+      'Requires SNOWFLAKE.CORTEX_USER or SNOWFLAKE.CORTEX_ANALYST_USER role',
+      'Disable via: ALTER ACCOUNT SET ENABLE_CORTEX_ANALYST = FALSE',
+      'Credit cost based on messages processed (HTTP 200 responses only)',
+    ],
+    useCases: 'Self-service analytics for business users, embedded chat interfaces, NL query tools.',
+    code: `-- Disable Cortex Analyst for the account
+USE ROLE ACCOUNTADMIN;
+ALTER ACCOUNT SET ENABLE_CORTEX_ANALYST = FALSE;
+
+-- Grant access to specific role only
+USE ROLE ACCOUNTADMIN;
+CREATE ROLE cortex_analyst_role;
+GRANT DATABASE ROLE SNOWFLAKE.CORTEX_ANALYST_USER
+  TO ROLE cortex_analyst_role;
+GRANT ROLE cortex_analyst_role TO USER analyst_user;
+
+-- Monitor cost
+SELECT * FROM SNOWFLAKE.ACCOUNT_USAGE.CORTEX_ANALYST_USAGE_HISTORY;`,
+  },
+  {
+    id: 'snowflake_ml',
+    emoji: '🤖',
+    label: 'Snowflake ML',
+    badge: 'End-to-end ML platform',
+    badgeColor: 'bg-emerald-600',
+    color: 'bg-emerald-50 border-emerald-200',
+    text: 'text-emerald-900',
+    what: 'Integrated ML platform for end-to-end model development, training, deployment, and monitoring — all inside Snowflake on governed data.',
+    keyFacts: [
+      'Feature Store — define, manage, store, discover ML features; supports batch + streaming incremental refresh',
+      'Model Registry — log, manage, deploy models (trained in or outside Snowflake)',
+      'ML Jobs — schedule and automate ML pipelines; dispatch from external IDEs',
+      'Experiments — record training runs, compare metrics, pick best model',
+      'Model Serving — deploy to Snowpark Container Services for inference',
+      'ML Observability — monitor performance drift, Shapley explainability',
+      'ML Lineage — trace data → features → datasets → models',
+      'Snowflake Datasets — immutable, versioned data snapshots for training',
+      'ML Functions — SQL functions for business analysts: forecasting, anomaly detection',
+    ],
+    useCases: 'Production ML pipelines, model governance, business forecasting (ML Functions), LLM fine-tuning.',
+    code: `-- ML Functions: built-in forecasting (no coding)
+SELECT SNOWFLAKE.ML.FORECAST(
+  INPUT_DATA  => SYSTEM$REFERENCE('VIEW', 'sales_history'),
+  TIMESTAMP_COLNAME => 'date',
+  TARGET_COLNAME    => 'revenue',
+  SERIES_COLNAME    => 'region',
+  CONFIG_OBJECT => {'prediction_interval': 0.95}
+);
+
+-- Anomaly detection
+SELECT SNOWFLAKE.ML.DETECT_ANOMALIES(
+  INPUT_DATA     => SYSTEM$REFERENCE('TABLE', 'metrics'),
+  TIMESTAMP_COLNAME => 'ts',
+  TARGET_COLNAME    => 'value'
+);`,
+  },
+];
+
+const CORTEX_COMPARE = [
+  { feature: 'Cortex AI Functions', type: 'SQL functions', purpose: 'Call LLMs to process text (summarize, classify, translate, embed)', billing: 'Per token', useWhen: 'Enrich table data with AI at scale in SQL' },
+  { feature: 'Cortex Search',       type: 'Managed service', purpose: 'Hybrid vector+keyword search over text data (RAG, enterprise search)', billing: 'Per GB/mo indexed + warehouse + tokens', useWhen: 'Fuzzy text search or RAG knowledge base' },
+  { feature: 'Cortex Analyst',      type: 'REST API',        purpose: 'Natural language → SQL for business Q&A on structured data', billing: 'Per message (HTTP 200)', useWhen: 'Non-technical users need self-service analytics' },
+];
+
+const AIMLTab = () => {
+  const [open, setOpen] = useState(null);
+
+  return (
+    <div className="space-y-5">
+
+      {/* ── Overview cards ── */}
+      <InfoCard>
+        <SectionHeader icon={Zap} color="bg-violet-600" title="AI/ML & App Dev — Big Picture"
+          subtitle="Snowflake provides a full stack for building data apps and ML pipelines — from libraries and notebooks to deployed LLM-powered services." />
+        <div className="grid sm:grid-cols-3 gap-3 mb-2">
+          {[
+            { emoji: '🐍', label: 'Snowpark', desc: 'Push-down data/ML library (Python, Java, Scala)', color: 'bg-blue-50 border-blue-200 text-blue-800' },
+            { emoji: '📓', label: 'Notebooks', desc: 'Jupyter-like SQL+Python IDE inside Snowsight', color: 'bg-indigo-50 border-indigo-200 text-indigo-800' },
+            { emoji: '🖥️', label: 'Streamlit in Snowflake', desc: 'Deploy Python web apps with no external infra', color: 'bg-pink-50 border-pink-200 text-pink-800' },
+            { emoji: '🧠', label: 'Cortex AI Functions', desc: 'SQL-callable LLMs: COMPLETE, CLASSIFY, EMBED...', color: 'bg-violet-50 border-violet-200 text-violet-800' },
+            { emoji: '🔍', label: 'Cortex Search', desc: 'Serverless hybrid search for RAG & enterprise search', color: 'bg-teal-50 border-teal-200 text-teal-800' },
+            { emoji: '💬', label: 'Cortex Analyst', desc: 'Natural language → SQL via REST API', color: 'bg-amber-50 border-amber-200 text-amber-800' },
+            { emoji: '🤖', label: 'Snowflake ML', desc: 'Feature Store, Model Registry, ML Jobs, Observability', color: 'bg-emerald-50 border-emerald-200 text-emerald-800' },
+          ].map((c, i) => (
+            <div key={i} className={`rounded-xl border p-3 ${c.color}`}>
+              <span className="text-2xl">{c.emoji}</span>
+              <p className="font-bold text-sm mt-1 mb-0.5">{c.label}</p>
+              <p className="text-xs opacity-80">{c.desc}</p>
+            </div>
+          ))}
+        </div>
+      </InfoCard>
+
+      {/* ── Deep dives ── */}
+      <InfoCard>
+        <SectionHeader icon={BookOpen} color="bg-violet-600" title="Feature Deep Dives"
+          subtitle="Click each feature to expand key facts, use cases, and SQL/Python code snippets." />
+        <div className="space-y-2">
+          {AIML_FEATURES.map((f, i) => (
+            <div key={f.id} className={`rounded-xl border overflow-hidden ${f.color}`}>
+              <button onClick={() => setOpen(open === i ? null : i)}
+                className="w-full flex items-center justify-between p-4 text-left">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{f.emoji}</span>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`font-bold text-sm ${f.text}`}>{f.label}</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full text-white ${f.badgeColor}`}>{f.badge}</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{f.what.split('.')[0]}.</p>
+                  </div>
+                </div>
+                <ChevronRight className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform ${open === i ? 'rotate-90' : ''}`} />
+              </button>
+              {open === i && (
+                <div className="px-5 pb-5 space-y-3">
+                  <p className={`text-xs leading-relaxed ${f.text}`}>{f.what}</p>
+                  <div className="grid sm:grid-cols-2 gap-2">
+                    {f.keyFacts.map((fact, j) => (
+                      <div key={j} className="flex items-start gap-2 bg-white/70 border border-white rounded-lg px-3 py-2">
+                        <CheckCircle className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${f.text}`} />
+                        <span className="text-xs text-slate-700">{fact}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className={`rounded-lg p-3 bg-white/60 border border-white text-xs ${f.text}`}>
+                    <span className="font-bold">📌 Use cases: </span>{f.useCases}
+                  </div>
+                  <CodeBlock code={f.code} />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </InfoCard>
+
+      {/* ── Cortex services comparison ── */}
+      <InfoCard>
+        <SectionHeader icon={Server} color="bg-violet-600" title="Cortex Services — Side-by-Side"
+          subtitle="Three distinct Cortex offerings that are frequently confused on the exam." />
+        <div className="overflow-x-auto mb-3">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="bg-slate-100 text-slate-600">
+                {['Service','Type','Purpose','Billing','Use When'].map((h, i) => (
+                  <th key={i} className={`text-left px-3 py-2 font-semibold ${i === 0 ? 'rounded-tl-lg' : i === 4 ? 'rounded-tr-lg' : ''}`}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {CORTEX_COMPARE.map((r, i) => (
+                <tr key={i} className={`border-t border-slate-100 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
+                  <td className="px-3 py-2 font-bold text-violet-700">{r.feature}</td>
+                  <td className="px-3 py-2 text-slate-600">{r.type}</td>
+                  <td className="px-3 py-2 text-slate-600">{r.purpose}</td>
+                  <td className="px-3 py-2 text-slate-600 font-mono text-[10px]">{r.billing}</td>
+                  <td className="px-3 py-2 text-slate-600">{r.useWhen}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="mt-3 bg-yellow-50 border border-yellow-200 rounded-xl p-3">
+          <p className="text-xs font-bold text-yellow-700 mb-1">⚡ Exam Tip — Cortex Services</p>
+          <ul className="text-xs text-yellow-700 space-y-1 list-disc pl-4">
+            <li><strong>AI Functions</strong>: call an LLM on table rows in SQL — text processing at scale.</li>
+            <li><strong>Cortex Search</strong>: vector+keyword index over text — power RAG or fuzzy search bars.</li>
+            <li><strong>Cortex Analyst</strong>: business user types a question → gets SQL-backed answer, no coding needed.</li>
+          </ul>
+        </div>
+      </InfoCard>
+
+      {/* ── Snowpark vs Notebooks vs SiS quick compare ── */}
+      <InfoCard>
+        <SectionHeader icon={GitBranch} color="bg-violet-600" title="Dev Tools — Quick Compare"
+          subtitle="Snowpark, Notebooks, and Streamlit each have distinct roles in the development workflow." />
+        <div className="grid sm:grid-cols-3 gap-3 mb-3">
+          {[
+            {
+              emoji: '🐍', label: 'Snowpark',
+              color: 'bg-blue-50 border-blue-200', text: 'text-blue-800',
+              rows: [
+                { q: 'Who uses it?',     a: 'Data engineers, ML engineers, developers' },
+                { q: 'Where runs?',      a: 'Client code locally or in Notebooks; compute in Snowflake' },
+                { q: 'Key abstraction',  a: 'DataFrame (lazy) + UDFs' },
+                { q: 'Best for',         a: 'Pipelines, transformations, ML training' },
+              ],
+            },
+            {
+              emoji: '📓', label: 'Notebooks',
+              color: 'bg-indigo-50 border-indigo-200', text: 'text-indigo-800',
+              rows: [
+                { q: 'Who uses it?',     a: 'Data scientists, analysts, engineers' },
+                { q: 'Where runs?',      a: 'Inside Snowsight (browser)' },
+                { q: 'Key abstraction',  a: 'Cells: SQL + Python + Markdown' },
+                { q: 'Best for',         a: 'EDA, prototyping, large-scale ML (Container Runtime)' },
+              ],
+            },
+            {
+              emoji: '🖥️', label: 'Streamlit in Snowflake',
+              color: 'bg-pink-50 border-pink-200', text: 'text-pink-800',
+              rows: [
+                { q: 'Who uses it?',     a: 'App developers, data engineers' },
+                { q: 'Where runs?',      a: 'Hosted inside Snowflake (no external server)' },
+                { q: 'Key abstraction',  a: 'Python Streamlit app + Snowflake object' },
+                { q: 'Best for',         a: 'Internal tools, dashboards, Cortex demos' },
+              ],
+            },
+          ].map((tool, i) => (
+            <div key={i} className={`rounded-xl border p-4 ${tool.color}`}>
+              <p className={`font-bold text-sm mb-3 ${tool.text}`}>{tool.emoji} {tool.label}</p>
+              <div className="space-y-2">
+                {tool.rows.map((r, j) => (
+                  <div key={j}>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{r.q}</p>
+                    <p className={`text-xs font-semibold ${tool.text}`}>{r.a}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </InfoCard>
+
+      {/* ── ML Functions callout ── */}
+      <InfoCard>
+        <SectionHeader icon={BarChart2} color="bg-emerald-600" title="Snowflake ML Functions"
+          subtitle="Pre-built ML capabilities callable in SQL — no model training required. For business analysts." />
+        <div className="grid sm:grid-cols-2 gap-3 mb-3">
+          {[
+            { emoji: '📈', label: 'Forecasting',         desc: 'Time-series demand/revenue forecasting on structured data. Supports series columns for per-group models.' },
+            { emoji: '🚨', label: 'Anomaly Detection',   desc: 'Detect unexpected spikes or dips in numeric time-series data automatically.' },
+            { emoji: '🏷️', label: 'Classification',      desc: 'Binary/multi-class classification on tabular data without writing ML code.' },
+            { emoji: '📊', label: 'Contribution Explorer', desc: 'Identify which dimensions drive a metric change — ML-powered root cause.' },
+          ].map((fn, i) => (
+            <div key={i} className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+              <p className="font-bold text-emerald-800 text-sm mb-1">{fn.emoji} {fn.label}</p>
+              <p className="text-xs text-emerald-700">{fn.desc}</p>
+            </div>
+          ))}
+        </div>
+        <CodeBlock code={`-- Time-series forecast (no Python needed)
+CREATE OR REPLACE SNOWFLAKE.ML.FORECAST revenue_forecast (
+  INPUT_DATA     => SYSTEM$REFERENCE('VIEW', 'daily_sales'),
+  TIMESTAMP_COLNAME  => 'sale_date',
+  TARGET_COLNAME     => 'revenue',
+  CONFIG_OBJECT      => {'prediction_interval': 0.90}
+);
+
+-- Run forecast 30 days ahead
+CALL revenue_forecast!FORECAST(FORECASTING_PERIODS => 30);
+
+-- Anomaly detection model
+CREATE OR REPLACE SNOWFLAKE.ML.ANOMALY_DETECTION anomaly_model (
+  INPUT_DATA      => SYSTEM$REFERENCE('TABLE', 'server_metrics'),
+  TIMESTAMP_COLNAME  => 'ts',
+  TARGET_COLNAME     => 'cpu_usage'
+);
+CALL anomaly_model!DETECT_ANOMALIES(
+  INPUT_DATA      => SYSTEM$REFERENCE('TABLE', 'server_metrics'),
+  TIMESTAMP_COLNAME  => 'ts',
+  TARGET_COLNAME     => 'cpu_usage'
+);`} />
+        <div className="mt-3 bg-yellow-50 border border-yellow-200 rounded-xl p-3">
+          <p className="text-xs font-bold text-yellow-700 mb-1">⚡ Exam Tip — ML Functions</p>
+          <ul className="text-xs text-yellow-700 space-y-1 list-disc pl-4">
+            <li>ML Functions are <strong>serverless</strong> — they use Snowflake-managed compute, not your warehouse.</li>
+            <li>They live in the <strong>SNOWFLAKE.ML</strong> schema and are called with <code>CALL model_object!FORECAST(...)</code> syntax.</li>
+            <li>Designed for <strong>business analysts</strong> who need ML insights without writing Python.</li>
+          </ul>
+        </div>
+      </InfoCard>
+
+      <ExamTip>
+        <p><strong>Snowpark</strong>: push-down library (Python/Java/Scala). DataFrame is lazy — runs when you call <code>.collect()</code>. Use Snowpark-optimized WH for ML training.</p>
+        <p><strong>Notebooks</strong>: SQL+Python cells inside Snowsight. Container Runtime = pre-installed PyTorch/XGBoost. Default WH = SYSTEM$STREAMLIT_NOTEBOOK_WH.</p>
+        <p><strong>Streamlit in Snowflake</strong>: Python web app deployed as a Snowflake object. No external server. RBAC-secured. Created via SQL, UI, or Snowflake CLI.</p>
+        <p><strong>Cortex AI Functions</strong>: COMPLETE, CLASSIFY, FILTER, EMBED, SENTIMENT, TRANSLATE in SQL. Requires CORTEX_USER role + USE AI FUNCTIONS privilege. Billed per token.</p>
+        <p><strong>Cortex Search</strong>: fully managed hybrid (vector+keyword) search. Serverless — no infra to manage. Powers RAG. Uses Dynamic Table refresh mechanics.</p>
+        <p><strong>Cortex Analyst</strong>: NL → SQL REST API. Uses Semantic Views (or YAML semantic model). Multi-turn conversations. Does NOT train on customer data.</p>
+        <p><strong>Snowflake ML</strong>: Feature Store + Model Registry + ML Jobs + Observability. ML Functions (FORECAST, ANOMALY_DETECTION) in SQL for analysts — serverless, no Python required.</p>
+      </ExamTip>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LEARNING TAB 5 — 1.5 Storage Concepts
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const CodeBlock = ({ code }) => (
@@ -1608,7 +2665,9 @@ const QUIZ_SECTIONS = [
   { id: 'tools',    label: 'Tool Scenarios',    emoji: '🔌', desc: '1.2 — Pick the right tool for each scenario' },
   { id: 'obj_sort', label: 'Object Sorter',     emoji: '📦', desc: '1.3 — Place objects in the correct hierarchy level' },
   { id: 'obj_mcq',  label: 'Object Types MCQ',  emoji: '🔢', desc: '1.3 — Stages, pipes, UDFs, params, context functions' },
+  { id: 'wh',       label: 'WH Scenarios',      emoji: '⚙️', desc: '1.4 — Sizing, scaling, types, billing scenarios' },
   { id: 'storage',  label: 'Storage Concepts',  emoji: '🗄️', desc: '1.5 — Micro-partitions, table types, clustering, views' },
+  { id: 'aiml',     label: 'AI/ML Features',    emoji: '🤖', desc: '1.6 — Snowpark, Notebooks, SiS, Cortex, Snowflake ML' },
 ];
 
 const QuizTab = () => {
@@ -1644,7 +2703,9 @@ const QuizTab = () => {
       {active === 'tools'    && <ToolScenarioGame />}
       {active === 'obj_sort' && <ObjectsSortGame />}
       {active === 'obj_mcq'  && <ObjectsMCQChallenge />}
+      {active === 'wh'       && <WarehouseScenarioPicker />}
       {active === 'storage'  && <StorageChallenge />}
+      {active === 'aiml'     && <AIMLChallenge />}
     </div>
   );
 };
@@ -2102,7 +3163,202 @@ const ToolScenarioGame = () => {
   );
 };
 
-// ── Challenge 4: Object Hierarchy Sorter ─────────────────────────────────────
+// ── Challenge 4: Warehouse Scenario Picker ───────────────────────────────────
+const WH_SCENARIOS_DATA = [
+  {
+    q: 'Queries on a production warehouse are running slowly. There are only 3 concurrent users. What is the best fix?',
+    options: ['Enable multi-cluster warehouses', 'Resize the warehouse to a larger size', 'Add more clusters with MAXIMIZED mode', 'Enable ECONOMY scaling policy'],
+    answer: 'Resize the warehouse to a larger size',
+    exp: 'Slow queries = scale UP (resize). Multi-cluster fixes concurrency queuing, not individual query speed.',
+  },
+  {
+    q: '150 BI analysts hit dashboards simultaneously every morning at 9am and queries queue heavily. What is the best fix?',
+    options: ['Resize warehouse to 6X-Large', 'Enable multi-cluster with Auto-scale mode', 'Use ECONOMY scaling policy', 'Separate analysts onto individual warehouses'],
+    answer: 'Enable multi-cluster with Auto-scale mode',
+    exp: 'Many concurrent users queuing = scale OUT with multi-cluster. Auto-scale handles peak/off-peak automatically.',
+  },
+  {
+    q: 'A data engineer runs a Python ML training stored procedure that crashes with out-of-memory errors. Which warehouse type should they use?',
+    options: ['Standard Gen2', 'Standard Gen1 X-Large', 'Snowpark-optimized', 'Multi-cluster Standard'],
+    answer: 'Snowpark-optimized',
+    exp: 'Snowpark-optimized warehouses provide 16× more memory per node vs standard — designed specifically for ML training workloads.',
+  },
+  {
+    q: 'A warehouse is sized X-Small (1 credit/hr). It runs for 30 seconds, then is suspended. How many credits are billed?',
+    options: ['0.008 (30 seconds)', '0.017 (60 seconds — minimum)', '1.0 (full hour)', '0.5 (half minute rate)'],
+    answer: '0.017 (60 seconds — minimum)',
+    exp: 'Per-second billing has a 60-second MINIMUM. Running for only 30 seconds still bills a full 60 seconds.',
+  },
+  {
+    q: 'Your ETL pipeline loads 10,000 small CSV files nightly. It is currently slow. What is the best approach?',
+    options: ['Upgrade warehouse from Medium to 4X-Large', 'Use a Snowpark-optimized warehouse', 'Keep a Medium warehouse but split files correctly and increase file count', 'Enable multi-cluster for the ETL warehouse'],
+    answer: 'Keep a Medium warehouse but split files correctly and increase file count',
+    exp: 'Data loading performance scales with NUMBER OF FILES, not warehouse size. Upsizing rarely helps loading.',
+  },
+  {
+    q: 'A multi-cluster Medium warehouse runs in Auto-scale mode with 3 clusters for 1 hour. Cluster 1 runs all hour, Clusters 2 and 3 run for 30 minutes each. What are the total credits billed?',
+    options: ['4 credits', '8 credits', '12 credits', '16 credits'],
+    answer: '8 credits',
+    exp: 'Medium = 4 credits/hr per cluster. Cluster1: 4, Cluster2: 2 (30 min), Cluster3: 2 (30 min) = 4+2+2 = 8 credits.',
+  },
+  {
+    q: 'An analyst needs a dedicated warehouse that wakes up immediately when they submit queries and never leaves data in cache during off-hours. What settings achieve this?',
+    options: [
+      'AUTO_RESUME=FALSE, AUTO_SUSPEND=0',
+      'AUTO_RESUME=TRUE, AUTO_SUSPEND=60',
+      'AUTO_RESUME=TRUE, AUTO_SUSPEND=NULL',
+      'AUTO_RESUME=FALSE, AUTO_SUSPEND=300',
+    ],
+    answer: 'AUTO_RESUME=TRUE, AUTO_SUSPEND=60',
+    exp: 'AUTO_RESUME=TRUE wakes on demand. AUTO_SUSPEND=60 (1 min) suspends quickly during inactivity, dropping cache and saving credits.',
+  },
+  {
+    q: 'You need a multi-cluster warehouse where ALL clusters are always running for maximum predictable capacity. Which mode do you use?',
+    options: ['Auto-scale with STANDARD policy', 'Auto-scale with ECONOMY policy', 'Maximized mode (MIN = MAX > 1)', 'Single-cluster with large size'],
+    answer: 'Maximized mode (MIN = MAX > 1)',
+    exp: 'Maximized mode: set MIN_CLUSTER_COUNT = MAX_CLUSTER_COUNT = same value > 1. All clusters run continuously.',
+  },
+  {
+    q: 'A multi-cluster warehouse uses ECONOMY scaling policy. How does it decide to start a new cluster?',
+    options: [
+      'As soon as any query is queued',
+      'Only if estimated load will keep the cluster busy for at least 6 minutes',
+      'Every 5 minutes during peak hours',
+      'When the warehouse reaches 50% utilization',
+    ],
+    answer: 'Only if estimated load will keep the cluster busy for at least 6 minutes',
+    exp: 'ECONOMY policy only starts a new cluster when there is enough estimated workload to justify it (≥6 min of work), conserving credits.',
+  },
+  {
+    q: 'Which warehouse privilege allows a role to suspend, resume, and resize warehouses it does NOT own?',
+    options: ['USAGE', 'OPERATE', 'MANAGE WAREHOUSES', 'MODIFY'],
+    answer: 'MANAGE WAREHOUSES',
+    exp: 'MANAGE WAREHOUSES on ACCOUNT grants MODIFY + MONITOR + OPERATE on ALL warehouses — equivalent to delegating full warehouse management.',
+  },
+  {
+    q: 'You resize a running Large warehouse to X-Large. What happens to the queries currently executing?',
+    options: [
+      'They are immediately re-run on the larger warehouse',
+      'They are cancelled and requeued',
+      'They continue on current resources; new size applies only to queued/new queries',
+      'The warehouse suspends and resumes at the new size',
+    ],
+    answer: 'They continue on current resources; new size applies only to queued/new queries',
+    exp: 'Resizing never interrupts running queries. New compute resources are used only for queued and future queries.',
+  },
+  {
+    q: 'The default warehouse for Snowflake Notebooks is called…',
+    options: ['SYSTEM$DEFAULT_NOTEBOOK_WH', 'SYSTEM$STREAMLIT_NOTEBOOK_WH', 'PUBLIC.NOTEBOOK_WH', 'COMPUTE_WH'],
+    answer: 'SYSTEM$STREAMLIT_NOTEBOOK_WH',
+    exp: 'SYSTEM$STREAMLIT_NOTEBOOK_WH is the auto-provisioned multi-cluster X-Small warehouse for Notebook workloads. PUBLIC role has USAGE by default.',
+  },
+];
+
+const WarehouseScenarioPicker = () => {
+  const [current, setCurrent] = useState(0);
+  const [picked,  setPicked]  = useState(null);
+  const [score,   setScore]   = useState(0);
+  const [history, setHistory] = useState([]);
+  const [done,    setDone]    = useState(false);
+
+  const scenario  = WH_SCENARIOS_DATA[current];
+  const isCorrect = picked === scenario?.answer;
+
+  const handlePick = useCallback((opt) => {
+    if (picked) return;
+    const correct = opt === scenario.answer;
+    setPicked(opt);
+    if (correct) setScore(s => s + 1);
+    setHistory(h => [...h, { ...scenario, picked: opt, correct }]);
+  }, [picked, scenario]);
+
+  const next  = () => { if (current + 1 >= WH_SCENARIOS_DATA.length) setDone(true); else { setCurrent(c => c + 1); setPicked(null); }};
+  const reset = () => { setCurrent(0); setPicked(null); setScore(0); setHistory([]); setDone(false); };
+
+  if (done) return (
+    <div className="space-y-4">
+      <InfoCard className="text-center py-8">
+        <p className="text-5xl mb-3">{score / WH_SCENARIOS_DATA.length >= 0.9 ? '🎉' : score / WH_SCENARIOS_DATA.length >= 0.7 ? '👍' : '📚'}</p>
+        <h3 className="text-2xl font-bold text-slate-800 mb-1">Warehouse Challenge Complete!</h3>
+        <p className="text-slate-500 mb-5">Score: <span className="font-bold text-violet-700 text-xl">{score}</span> / {WH_SCENARIOS_DATA.length}</p>
+        <button onClick={reset} className="bg-violet-600 hover:bg-violet-700 text-white font-bold px-8 py-3 rounded-xl">Retry</button>
+      </InfoCard>
+      <InfoCard>
+        <h3 className="font-bold text-slate-700 mb-3">Full Review</h3>
+        <div className="space-y-2">
+          {history.map((h, i) => (
+            <div key={i} className={`p-3 rounded-xl border text-xs ${h.correct ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+              <p className="font-medium text-slate-600 mb-1">{h.q}</p>
+              {h.correct
+                ? <p className="text-emerald-700 font-bold">✓ {h.answer}</p>
+                : <><p className="text-red-700">✗ You picked: <span className="font-bold">{h.picked}</span></p>
+                   <p className="text-red-700">✓ Correct: <span className="font-bold">{h.answer}</span></p></>
+              }
+              <p className="text-slate-500 mt-1 italic">{h.exp}</p>
+            </div>
+          ))}
+        </div>
+      </InfoCard>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-bold text-slate-700">Scenario {current + 1} of {WH_SCENARIOS_DATA.length}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-semibold text-violet-600">Score: {score}</span>
+            <button onClick={reset} className="flex items-center gap-1 text-xs text-violet-600 hover:text-violet-800 font-semibold">
+              <RefreshCw className="w-3 h-3" /> Reset
+            </button>
+          </div>
+        </div>
+        <div className="w-full bg-slate-100 rounded-full h-2">
+          <div className="bg-violet-500 h-2 rounded-full transition-all duration-500"
+            style={{ width: `${(current / WH_SCENARIOS_DATA.length) * 100}%` }} />
+        </div>
+      </div>
+
+      <InfoCard>
+        <p className="text-[10px] font-bold text-violet-600 uppercase tracking-wider mb-2">Warehouse Scenario</p>
+        <p className="text-base font-semibold text-slate-800 leading-relaxed mb-5">{scenario.q}</p>
+        <div className="grid sm:grid-cols-2 gap-2">
+          {scenario.options.map(opt => {
+            const isAnswer = opt === scenario.answer;
+            const isPicked = opt === picked;
+            let cls = 'border-slate-200 bg-white text-slate-700 hover:border-violet-300 hover:bg-violet-50';
+            if (picked) {
+              if (isAnswer)       cls = 'border-emerald-400 bg-emerald-50 text-emerald-800 font-bold';
+              else if (isPicked)  cls = 'border-red-300 bg-red-50 text-red-700 line-through opacity-70';
+              else                cls = 'border-slate-100 bg-slate-50 text-slate-300 opacity-40';
+            }
+            return (
+              <button key={opt} disabled={!!picked} onClick={() => handlePick(opt)}
+                className={`text-sm px-4 py-3 rounded-xl border text-left transition-all leading-snug ${cls}`}>
+                {opt}
+              </button>
+            );
+          })}
+        </div>
+        {picked && (
+          <div className={`mt-4 p-4 rounded-xl border ${isCorrect ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+            <p className={`text-sm font-bold mb-1 ${isCorrect ? 'text-emerald-800' : 'text-red-800'}`}>
+              {isCorrect ? '✓ Correct!' : `✗ Correct answer: ${scenario.answer}`}
+            </p>
+            <p className={`text-sm ${isCorrect ? 'text-emerald-700' : 'text-red-700'}`}>{scenario.exp}</p>
+            <button onClick={next}
+              className="mt-3 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold px-6 py-2.5 rounded-xl transition-colors">
+              {current + 1 < WH_SCENARIOS_DATA.length ? 'Next →' : 'See Results'}
+            </button>
+          </div>
+        )}
+      </InfoCard>
+    </div>
+  );
+};
+
+// ── Challenge 5: Object Hierarchy Sorter ─────────────────────────────────────
 const OBJ_LEVEL_DATA = [
   { id: 'org',     label: 'Organization', emoji: '🌐', color: 'bg-violet-600', light: 'bg-violet-50', border: 'border-violet-300', text: 'text-violet-800' },
   { id: 'account', label: 'Account',      emoji: '🏢', color: 'bg-blue-600',   light: 'bg-blue-50',   border: 'border-blue-300',   text: 'text-blue-800' },
@@ -2392,6 +3648,201 @@ const ObjectsMCQChallenge = () => {
           : `Check Answers (${Object.keys(answers).length}/${OBJECTS_MCQ_DATA.length} answered)`}
       </button>
     </InfoCard>
+  );
+};
+
+// ── Challenge 6: AI/ML Features MCQ ─────────────────────────────────────────
+const AIML_MCQ_DATA = [
+  {
+    q: 'A data scientist writes Snowpark Python code that builds a DataFrame pipeline. When does the SQL actually run in Snowflake?',
+    options: ['When the DataFrame is created', 'When the filter is applied', 'When .collect() or another action is called', 'When the session is started'],
+    answer: 'When .collect() or another action is called',
+    exp: 'Snowpark DataFrames are lazy — transformations are not executed until an action (collect, show, etc.) is called, which sends the compiled SQL to Snowflake.',
+  },
+  {
+    q: 'A developer wants to build an internal analytics dashboard using Python and deploy it inside Snowflake with no external servers. Which feature should they use?',
+    options: ['Snowpark stored procedure', 'Snowflake Notebooks', 'Streamlit in Snowflake', 'Cortex Analyst REST API'],
+    answer: 'Streamlit in Snowflake',
+    exp: 'Streamlit in Snowflake (SiS) lets you deploy Python web apps as Snowflake objects — no external infrastructure needed.',
+  },
+  {
+    q: 'Which privilege combination is required for a user to call Cortex AI Functions like AI_COMPLETE?',
+    options: [
+      'SYSADMIN role only',
+      'SNOWFLAKE.CORTEX_USER database role AND USE AI FUNCTIONS privilege',
+      'ACCOUNTADMIN role only',
+      'USAGE on the function schema',
+    ],
+    answer: 'SNOWFLAKE.CORTEX_USER database role AND USE AI FUNCTIONS privilege',
+    exp: 'Both are required: the CORTEX_USER database role AND the account-level USE AI FUNCTIONS privilege. By default, both are granted to PUBLIC.',
+  },
+  {
+    q: 'A business analyst wants to ask "What was last month\u0027s revenue by region?" in plain English and get an answer from Snowflake data — without writing SQL. Which Cortex feature handles this?',
+    options: ['Cortex AI Functions (AI_COMPLETE)', 'Cortex Search', 'Cortex Analyst', 'Snowflake ML Forecasting'],
+    answer: 'Cortex Analyst',
+    exp: 'Cortex Analyst converts natural language business questions to SQL using a Semantic View or YAML semantic model — designed for non-technical users.',
+  },
+  {
+    q: 'A team needs low-latency fuzzy search over a large collection of customer support tickets to power an AI chatbot (RAG). Which Cortex service should they use?',
+    options: ['Cortex Analyst', 'AI_COMPLETE with a large context window', 'Cortex Search', 'AI_EXTRACT'],
+    answer: 'Cortex Search',
+    exp: 'Cortex Search provides hybrid vector+keyword search with semantic reranking — purpose-built for RAG knowledge bases and enterprise search.',
+  },
+  {
+    q: 'Which Snowpark warehouse type is recommended for an ML training stored procedure that requires 200 GB of memory?',
+    options: ['Standard X-Large', 'Standard 4X-Large', 'Snowpark-optimized with MEMORY_16X', 'Multi-cluster Standard'],
+    answer: 'Snowpark-optimized with MEMORY_16X',
+    exp: 'Snowpark-optimized warehouses provide 16× memory per node by default (MEMORY_16X = 256 GB). Standard warehouses do not offer per-node memory scaling.',
+  },
+  {
+    q: 'A data analyst wants to forecast sales for the next 30 days using SQL, without writing any Python. Which Snowflake feature enables this?',
+    options: ['Snowpark ML model', 'Cortex AI_COMPLETE', 'Snowflake ML Functions (SNOWFLAKE.ML.FORECAST)', 'Snowflake Datasets'],
+    answer: 'Snowflake ML Functions (SNOWFLAKE.ML.FORECAST)',
+    exp: 'ML Functions like SNOWFLAKE.ML.FORECAST are serverless, SQL-callable ML capabilities — no Python or model training required.',
+  },
+  {
+    q: 'A Cortex Search service is created with TARGET_LAG = \'1 hour\'. What does this mean?',
+    options: [
+      'The service must respond to queries within 1 hour',
+      'The index refreshes from base data approximately every 1 hour',
+      'Queries older than 1 hour are expired',
+      'The service is available for only 1 hour after creation',
+    ],
+    answer: 'The index refreshes from base data approximately every 1 hour',
+    exp: 'TARGET_LAG in Cortex Search works like Dynamic Tables — it defines the maximum lag between base data changes and the search index being updated.',
+  },
+  {
+    q: 'Which of the following is NOT a Cortex AI Function?',
+    options: ['AI_COMPLETE', 'AI_FORECAST', 'AI_CLASSIFY', 'AI_SENTIMENT'],
+    answer: 'AI_FORECAST',
+    exp: 'AI_FORECAST does not exist. Forecasting is done via SNOWFLAKE.ML.FORECAST (an ML Function). Cortex AI Functions include COMPLETE, CLASSIFY, FILTER, SENTIMENT, TRANSLATE, EMBED, etc.',
+  },
+  {
+    q: 'Streamlit in Snowflake apps can be created via which methods?',
+    options: [
+      'Snowsight UI only',
+      'SQL only',
+      'Snowsight UI, SQL, or Snowflake CLI',
+      'Snowflake CLI only',
+    ],
+    answer: 'Snowsight UI, SQL, or Snowflake CLI',
+    exp: 'SiS apps can be created and deployed via Snowsight, SQL (CREATE STREAMLIT), or Snowflake CLI — all three methods are supported.',
+  },
+  {
+    q: 'The Snowflake Feature Store is part of which product?',
+    options: ['Streamlit in Snowflake', 'Snowpark API', 'Snowflake ML', 'Cortex Search'],
+    answer: 'Snowflake ML',
+    exp: 'The Feature Store is a component of Snowflake ML — it defines, manages, stores, and discovers ML features with automated incremental refresh from batch and streaming sources.',
+  },
+  {
+    q: 'Cortex Analyst uses which object type to bridge business language and database schema?',
+    options: ['External tables', 'Semantic Views (or YAML semantic model on a stage)', 'Dynamic tables', 'Information Schema views'],
+    answer: 'Semantic Views (or YAML semantic model on a stage)',
+    exp: 'Cortex Analyst relies on Semantic Views (recommended, schema-level objects) or legacy YAML semantic model files on a stage to understand business concepts like metrics, dimensions, and relationships.',
+  },
+];
+
+const AIMLChallenge = () => {
+  const [current, setCurrent] = useState(0);
+  const [picked,  setPicked]  = useState(null);
+  const [score,   setScore]   = useState(0);
+  const [history, setHistory] = useState([]);
+  const [done,    setDone]    = useState(false);
+
+  const q = AIML_MCQ_DATA[current];
+  const isCorrect = picked === q?.answer;
+
+  const handlePick = useCallback((opt) => {
+    if (picked) return;
+    const correct = opt === q.answer;
+    setPicked(opt);
+    if (correct) setScore(s => s + 1);
+    setHistory(h => [...h, { ...q, picked: opt, correct }]);
+  }, [picked, q]);
+
+  const next  = () => { if (current + 1 >= AIML_MCQ_DATA.length) setDone(true); else { setCurrent(c => c + 1); setPicked(null); }};
+  const reset = () => { setCurrent(0); setPicked(null); setScore(0); setHistory([]); setDone(false); };
+
+  if (done) return (
+    <div className="space-y-4">
+      <InfoCard className="text-center py-8">
+        <p className="text-5xl mb-3">{score / AIML_MCQ_DATA.length >= 0.9 ? '🎉' : score / AIML_MCQ_DATA.length >= 0.7 ? '👍' : '📚'}</p>
+        <h3 className="text-2xl font-bold text-slate-800 mb-1">AI/ML Challenge Complete!</h3>
+        <p className="text-slate-500 mb-5">Score: <span className="font-bold text-violet-700 text-xl">{score}</span> / {AIML_MCQ_DATA.length}</p>
+        <button onClick={reset} className="bg-violet-600 hover:bg-violet-700 text-white font-bold px-8 py-3 rounded-xl">Retry</button>
+      </InfoCard>
+      <InfoCard>
+        <h3 className="font-bold text-slate-700 mb-3">Full Review</h3>
+        <div className="space-y-2">
+          {history.map((h, i) => (
+            <div key={i} className={`p-3 rounded-xl border text-xs ${h.correct ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+              <p className="font-medium text-slate-600 mb-1">{h.q}</p>
+              {h.correct
+                ? <p className="text-emerald-700 font-bold">✓ {h.answer}</p>
+                : <><p className="text-red-700">✗ You picked: <span className="font-bold">{h.picked}</span></p>
+                   <p className="text-red-700">✓ Correct: <span className="font-bold">{h.answer}</span></p></>
+              }
+              <p className="text-slate-500 mt-1 italic">{h.exp}</p>
+            </div>
+          ))}
+        </div>
+      </InfoCard>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-bold text-slate-700">Question {current + 1} of {AIML_MCQ_DATA.length}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-semibold text-violet-600">Score: {score}</span>
+            <button onClick={reset} className="flex items-center gap-1 text-xs text-violet-600 hover:text-violet-800 font-semibold">
+              <RefreshCw className="w-3 h-3" /> Reset
+            </button>
+          </div>
+        </div>
+        <div className="w-full bg-slate-100 rounded-full h-2">
+          <div className="bg-violet-500 h-2 rounded-full transition-all duration-500"
+            style={{ width: `${(current / AIML_MCQ_DATA.length) * 100}%` }} />
+        </div>
+      </div>
+
+      <InfoCard>
+        <p className="text-[10px] font-bold text-violet-600 uppercase tracking-wider mb-2">AI/ML Features Question</p>
+        <p className="text-base font-semibold text-slate-800 leading-relaxed mb-5">{q.q}</p>
+        <div className="grid sm:grid-cols-2 gap-2">
+          {q.options.map(opt => {
+            const isAns = opt === q.answer;
+            const isPicked = opt === picked;
+            let cls = 'border-slate-200 bg-white text-slate-700 hover:border-violet-300 hover:bg-violet-50';
+            if (picked) {
+              if (isAns)       cls = 'border-emerald-400 bg-emerald-50 text-emerald-800 font-bold';
+              else if (isPicked) cls = 'border-red-300 bg-red-50 text-red-700 line-through opacity-70';
+              else               cls = 'border-slate-100 bg-slate-50 text-slate-300 opacity-40';
+            }
+            return (
+              <button key={opt} disabled={!!picked} onClick={() => handlePick(opt)}
+                className={`text-sm px-4 py-3 rounded-xl border text-left transition-all leading-snug ${cls}`}>
+                {opt}
+              </button>
+            );
+          })}
+        </div>
+        {picked && (
+          <div className={`mt-4 p-4 rounded-xl border ${isCorrect ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+            <p className={`text-sm font-bold mb-1 ${isCorrect ? 'text-emerald-800' : 'text-red-800'}`}>
+              {isCorrect ? '✓ Correct!' : `✗ Correct answer: ${q.answer}`}
+            </p>
+            <p className={`text-sm ${isCorrect ? 'text-emerald-700' : 'text-red-700'}`}>{q.exp}</p>
+            <button onClick={next}
+              className="mt-3 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold px-6 py-2.5 rounded-xl transition-colors">
+              {current + 1 < AIML_MCQ_DATA.length ? 'Next →' : 'See Results'}
+            </button>
+          </div>
+        )}
+      </InfoCard>
+    </div>
   );
 };
 

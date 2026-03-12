@@ -20,7 +20,14 @@ const DOMAINS = [
     shortLabel: 'Architecture',
     icon: Layers,
     color: { bg: 'bg-blue-700', light: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', badge: 'bg-blue-100 text-blue-800' },
-    topics: ['Architecture layers', 'Snowflake editions', 'Object hierarchy', 'Virtual warehouses', 'Storage concepts', 'AI/ML features'],
+    topics: [
+      '1.1 Architecture layers & editions',
+      '1.2 Interfaces & tools (Snowsight, CLI, VS Code)',
+      '1.3 Object hierarchy (org, account, DB, schema, objects)',
+      '1.4 Virtual warehouses (types, scaling, best practices)',
+      '1.5 Storage concepts (micro-partitions, table & view types)',
+      '1.6 AI/ML features (Snowpark, Notebooks, SiS, Cortex, ML)',
+    ],
     component: Domain1,
   },
   {
