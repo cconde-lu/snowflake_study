@@ -81,9 +81,10 @@ const Domain1_Architecture = () => {
 
       {activeTab === 'architecture' && <ArchitectureTab />}
       {activeTab === 'interfaces'   && <InterfacesTab />}
+      {activeTab === 'objects'      && <ObjectsTab />}
       {activeTab === 'storage'      && <StorageTab />}
       {activeTab === 'quiz'         && <QuizTab />}
-      {!['architecture','interfaces','storage','quiz'].includes(activeTab) &&
+      {!['architecture','interfaces','objects','storage','quiz'].includes(activeTab) &&
         <ComingSoon tab={TABS.find(t => t.id === activeTab)?.label} />}
     </div>
   );
@@ -622,7 +623,559 @@ const InterfacesTab = () => {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// LEARNING TAB 3 — 1.5 Storage Concepts
+// LEARNING TAB 3 — 1.3 Object Hierarchy
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const HIERARCHY_LEVELS = [
+  {
+    id: 'org',
+    emoji: '🌐', label: 'Organization',
+    bg: 'bg-violet-600', light: 'bg-violet-50', border: 'border-violet-300', text: 'text-violet-900',
+    desc: 'Top-most container. Links all accounts owned by a business entity. Enables cross-account replication, billing consolidation, and ORGANIZATION_USAGE views.',
+    objects: ['Accounts', 'Replication groups', 'Failover groups'],
+    code: `-- View all accounts in your organization
+SHOW ACCOUNTS;
+
+-- Get current organization name
+SELECT CURRENT_ORGANIZATION_NAME();`,
+  },
+  {
+    id: 'account',
+    emoji: '🏢', label: 'Account',
+    bg: 'bg-blue-600', light: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-900',
+    desc: 'Primary operating unit. Contains users, roles, warehouses, databases, and all security/governance objects. Billed independently. Identified by org_name.account_name.',
+    objects: ['Users', 'Roles', 'Warehouses', 'Databases', 'Integrations', 'Network policies', 'Resource monitors'],
+    code: `-- Account-level objects
+CREATE USER analyst PASSWORD='xxx' DEFAULT_ROLE='analyst_role';
+CREATE ROLE analyst_role;
+CREATE WAREHOUSE compute_wh WAREHOUSE_SIZE='MEDIUM';
+CREATE DATABASE sales_db;
+
+-- Grant role to user
+GRANT ROLE analyst_role TO USER analyst;`,
+  },
+  {
+    id: 'database',
+    emoji: '🗄️', label: 'Database',
+    bg: 'bg-teal-600', light: 'bg-teal-50', border: 'border-teal-300', text: 'text-teal-900',
+    desc: 'Logical grouping of schemas. No hard limits on number of databases per account. Every database automatically contains an INFORMATION_SCHEMA.',
+    objects: ['Schemas', 'INFORMATION_SCHEMA (auto-created)'],
+    code: `CREATE DATABASE sales_db
+  DATA_RETENTION_TIME_IN_DAYS = 7;
+
+-- Clone a database (zero-copy)
+CREATE DATABASE sales_db_dev
+  CLONE sales_db;`,
+  },
+  {
+    id: 'schema',
+    emoji: '📂', label: 'Schema',
+    bg: 'bg-slate-600', light: 'bg-slate-50', border: 'border-slate-300', text: 'text-slate-900',
+    desc: 'Logical grouping of database objects (tables, views, stages, etc.). The PUBLIC schema is auto-created in every database. Schemas can be TRANSIENT.',
+    objects: ['Tables', 'Views', 'Stages', 'File Formats', 'Sequences', 'Pipes', 'Streams', 'Tasks', 'UDFs', 'Stored Procedures', 'Shares', 'ML Models', 'Applications'],
+    code: `CREATE SCHEMA sales_db.raw;
+CREATE TRANSIENT SCHEMA sales_db.staging;
+
+-- Show all schemas in a database
+SHOW SCHEMAS IN DATABASE sales_db;`,
+  },
+];
+
+const DB_OBJECTS_DATA = [
+  {
+    id: 'stage',
+    emoji: '📤', label: 'Stage',
+    color: 'bg-blue-50 border-blue-200', text: 'text-blue-800',
+    desc: 'Named storage location for data files used in loading/unloading. Three types: User, Table, and Named stages.',
+    subtypes: [
+      { name: 'User Stage',  note: '@~  — one per user, auto-created, private' },
+      { name: 'Table Stage', note: '@%tablename  — one per table, auto-created' },
+      { name: 'Named Stage', note: 'Explicit CREATE STAGE — can be internal or external (cloud)' },
+    ],
+    code: `-- Internal named stage
+CREATE STAGE my_internal_stage;
+
+-- External stage (S3 via storage integration)
+CREATE STAGE my_s3_stage
+  URL = 's3://my-bucket/path/'
+  STORAGE_INTEGRATION = my_s3_int;
+
+-- List files in stage
+LIST @my_internal_stage;`,
+  },
+  {
+    id: 'udf',
+    emoji: '🔧', label: 'UDF (User-Defined Function)',
+    color: 'bg-indigo-50 border-indigo-200', text: 'text-indigo-800',
+    desc: 'Custom scalar or tabular function callable from SQL. Supports Java, JavaScript, Python, SQL. Returns a value — does NOT execute DML.',
+    subtypes: [
+      { name: 'Scalar UDF',   note: 'Returns one value per row' },
+      { name: 'Tabular UDF (UDTF)', note: 'Returns a set of rows per input row' },
+      { name: 'Secure UDF',   note: 'Hides implementation — like secure views' },
+    ],
+    code: `-- JavaScript scalar UDF
+CREATE OR REPLACE FUNCTION add_tax(price FLOAT, rate FLOAT)
+  RETURNS FLOAT
+  LANGUAGE JAVASCRIPT
+AS $$
+  return PRICE * (1 + RATE);
+$$;
+
+-- Python UDF
+CREATE OR REPLACE FUNCTION to_upper(s STRING)
+  RETURNS STRING
+  LANGUAGE PYTHON
+  RUNTIME_VERSION = '3.11'
+  HANDLER = 'compute'
+AS $$
+def compute(s): return s.upper()
+$$;
+
+SELECT add_tax(100.0, 0.08);  -- → 108.0`,
+  },
+  {
+    id: 'fileformat',
+    emoji: '📋', label: 'File Format',
+    color: 'bg-amber-50 border-amber-200', text: 'text-amber-800',
+    desc: 'Named object that describes the format of staged data files. Reusable across COPY INTO commands and external tables. Supported: CSV, JSON, Avro, ORC, Parquet, XML.',
+    subtypes: [],
+    code: `-- Create a reusable CSV file format
+CREATE FILE FORMAT my_csv_fmt
+  TYPE = 'CSV'
+  FIELD_DELIMITER = ','
+  SKIP_HEADER = 1
+  NULL_IF = ('NULL', 'null')
+  EMPTY_FIELD_AS_NULL = TRUE;
+
+-- Use it in a COPY command
+COPY INTO orders
+  FROM @my_stage
+  FILE_FORMAT = (FORMAT_NAME = 'my_csv_fmt');`,
+  },
+  {
+    id: 'storedproc',
+    emoji: '⚙️', label: 'Stored Procedure',
+    color: 'bg-rose-50 border-rose-200', text: 'text-rose-800',
+    desc: 'Procedural logic with branching, looping, and DML. Can run with caller\'s rights or owner\'s rights. Supports Java, JavaScript, Python, Scala, SQL Scripting.',
+    subtypes: [
+      { name: "Caller's rights", note: 'Runs with privileges of the CALLING role' },
+      { name: "Owner's rights",  note: "Runs with privileges of the OWNER's role (default)" },
+    ],
+    code: `-- Python stored procedure
+CREATE OR REPLACE PROCEDURE clean_old_data(cutoff_date DATE)
+  RETURNS STRING
+  LANGUAGE PYTHON
+  RUNTIME_VERSION = '3.11'
+  PACKAGES = ('snowflake-snowpark-python')
+  HANDLER = 'run'
+AS $$
+def run(session, cutoff_date):
+  session.sql(
+    f"DELETE FROM orders WHERE order_date < '{cutoff_date}'"
+  ).collect()
+  return 'Done'
+$$;
+
+CALL clean_old_data('2023-01-01');`,
+  },
+  {
+    id: 'pipe',
+    emoji: '🚿', label: 'Pipe',
+    color: 'bg-cyan-50 border-cyan-200', text: 'text-cyan-800',
+    desc: 'Powers Snowpipe — auto-ingest files as soon as they land in a stage. Uses a COPY INTO statement internally. Near-real-time micro-batch loading.',
+    subtypes: [],
+    code: `CREATE PIPE orders_pipe
+  AUTO_INGEST = TRUE
+AS
+  COPY INTO orders
+  FROM @my_s3_stage
+  FILE_FORMAT = (TYPE = 'JSON');
+
+-- Check pipe status
+SELECT SYSTEM$PIPE_STATUS('orders_pipe');
+
+-- Pause / resume
+ALTER PIPE orders_pipe PAUSE;
+ALTER PIPE orders_pipe RESUME;`,
+  },
+  {
+    id: 'share',
+    emoji: '🤝', label: 'Share',
+    color: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-800',
+    desc: 'Snowflake Secure Data Sharing object. Provider creates a share, adds objects (databases, tables, views), and grants to consumer accounts — zero data movement.',
+    subtypes: [],
+    code: `-- Provider side: create and populate a share
+CREATE SHARE sales_share;
+GRANT USAGE ON DATABASE sales_db TO SHARE sales_share;
+GRANT USAGE ON SCHEMA   sales_db.public TO SHARE sales_share;
+GRANT SELECT ON TABLE   sales_db.public.orders TO SHARE sales_share;
+
+-- Grant share to a consumer account
+ALTER SHARE sales_share
+  ADD ACCOUNTS = org_name.consumer_acct;
+
+-- Consumer side: create a database from the share
+CREATE DATABASE shared_sales
+  FROM SHARE provider_org.provider_acct.sales_share;`,
+  },
+  {
+    id: 'sequence',
+    emoji: '🔢', label: 'Sequence',
+    color: 'bg-purple-50 border-purple-200', text: 'text-purple-800',
+    desc: 'Generates unique, sequential integer values. Used as surrogate keys. Values are guaranteed unique but NOT guaranteed gap-free (due to concurrency).',
+    subtypes: [],
+    code: `CREATE SEQUENCE order_seq
+  START = 1
+  INCREMENT = 1;
+
+-- Use in INSERT
+INSERT INTO orders (order_id, customer)
+  VALUES (order_seq.NEXTVAL, 'Acme Corp');
+
+-- Or as column default
+CREATE TABLE orders (
+  order_id NUMBER DEFAULT order_seq.NEXTVAL,
+  customer STRING
+);`,
+  },
+  {
+    id: 'mlmodel',
+    emoji: '🤖', label: 'ML Model',
+    color: 'bg-sky-50 border-sky-200', text: 'text-sky-800',
+    desc: 'Registered ML model stored in the Snowflake Model Registry. Supports Python-based models (scikit-learn, XGBoost, PyTorch, etc.). Callable from SQL via model methods.',
+    subtypes: [],
+    code: `-- Register a model from a Snowpark ML pipeline
+-- (after training with Snowpark ML)
+reg = Registry(session=session, database_name="ML_DB",
+               schema_name="MODELS")
+mv = reg.log_model(my_model,
+  model_name="churn_predictor",
+  version_name="v1",
+  sample_input_data=X_train)
+
+-- Call the model from SQL
+SELECT churn_predictor!PREDICT(features) AS prediction
+FROM customer_features;`,
+  },
+  {
+    id: 'application',
+    emoji: '📦', label: 'Application',
+    color: 'bg-orange-50 border-orange-200', text: 'text-orange-800',
+    desc: 'Snowflake Native App — a packaged application built using the Native App Framework. Can include Streamlit UIs, stored procedures, UDFs, and container workloads.',
+    subtypes: [],
+    code: `-- Create an application package (provider side)
+CREATE APPLICATION PACKAGE my_app_pkg;
+
+-- Create the application (consumer installs it)
+CREATE APPLICATION my_app
+  FROM APPLICATION PACKAGE my_app_pkg
+  USING VERSION v1;
+
+-- Installed apps appear as database-like objects
+SHOW APPLICATIONS;`,
+  },
+];
+
+const PARAM_LEVELS = [
+  {
+    id: 'account',
+    emoji: '🏢', label: 'Account Level',
+    bg: 'bg-blue-600', light: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-900',
+    who: 'ACCOUNTADMIN / SYSADMIN',
+    scope: 'Sets defaults for ALL users and sessions in the account',
+    examples: ['TIMEZONE', 'DATA_RETENTION_TIME_IN_DAYS', 'NETWORK_POLICY', 'MIN_DATA_RETENTION_TIME_IN_DAYS'],
+    code: `ALTER ACCOUNT SET TIMEZONE = 'America/Chicago';
+ALTER ACCOUNT SET DATA_RETENTION_TIME_IN_DAYS = 7;`,
+  },
+  {
+    id: 'user',
+    emoji: '👤', label: 'User Level',
+    bg: 'bg-indigo-600', light: 'bg-indigo-50', border: 'border-indigo-300', text: 'text-indigo-900',
+    who: 'SECURITYADMIN or the user themselves',
+    scope: 'Overrides account defaults for that specific user. Becomes default for all their sessions.',
+    examples: ['DEFAULT_ROLE', 'DEFAULT_WAREHOUSE', 'DEFAULT_NAMESPACE', 'TIMEZONE'],
+    code: `ALTER USER analyst
+  SET DEFAULT_ROLE = 'analyst_role'
+      DEFAULT_WAREHOUSE = 'analyst_wh'
+      TIMEZONE = 'UTC';`,
+  },
+  {
+    id: 'session',
+    emoji: '💻', label: 'Session Level',
+    bg: 'bg-teal-600', light: 'bg-teal-50', border: 'border-teal-300', text: 'text-teal-900',
+    who: 'Any user — applies to current session only',
+    scope: 'Temporary override for the current connection. Cleared when the session ends.',
+    examples: ['TIMEZONE', 'QUERY_TAG', 'STATEMENT_TIMEOUT_IN_SECONDS', 'DATE_INPUT_FORMAT'],
+    code: `ALTER SESSION SET TIMEZONE = 'Europe/London';
+ALTER SESSION SET QUERY_TAG = 'etl-pipeline-run-123';
+ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = 300;
+
+-- View current session parameters
+SHOW PARAMETERS IN SESSION;`,
+  },
+  {
+    id: 'object',
+    emoji: '📦', label: 'Object Level',
+    bg: 'bg-slate-600', light: 'bg-slate-50', border: 'border-slate-300', text: 'text-slate-900',
+    who: 'User with CREATE/ALTER privilege on that object',
+    scope: 'Applies to a specific object only (table, warehouse, schema, etc.)',
+    examples: ['DATA_RETENTION_TIME_IN_DAYS (table)', 'MAX_CONCURRENCY_LEVEL (warehouse)', 'AUTO_SUSPEND (warehouse)'],
+    code: `-- Override Time Travel at table level
+ALTER TABLE orders
+  SET DATA_RETENTION_TIME_IN_DAYS = 30;
+
+-- Override at warehouse level
+ALTER WAREHOUSE compute_wh
+  SET MAX_CONCURRENCY_LEVEL = 8
+      AUTO_SUSPEND = 120;`,
+  },
+];
+
+const CONTEXT_FUNCTIONS = [
+  { fn: 'CURRENT_ACCOUNT()',         desc: 'Returns the name of the current account' },
+  { fn: 'CURRENT_ORGANIZATION_NAME()', desc: 'Returns the org name' },
+  { fn: 'CURRENT_USER()',            desc: 'Returns the logged-in user name' },
+  { fn: 'CURRENT_ROLE()',            desc: 'Returns the active role in the session' },
+  { fn: 'CURRENT_DATABASE()',        desc: 'Returns the active database' },
+  { fn: 'CURRENT_SCHEMA()',          desc: 'Returns the active schema' },
+  { fn: 'CURRENT_WAREHOUSE()',       desc: 'Returns the active virtual warehouse' },
+  { fn: 'CURRENT_SESSION()',         desc: 'Returns a unique session identifier' },
+  { fn: 'CURRENT_TIMESTAMP()',       desc: 'Returns the current date and time (with timezone)' },
+  { fn: 'LAST_QUERY_ID()',           desc: 'Returns the query ID of the most recent query in the session' },
+];
+
+const ObjectsTab = () => {
+  const [activeLevel,   setActiveLevel]   = useState(null);
+  const [activeObj,     setActiveObj]     = useState(null);
+  const [activeParam,   setActiveParam]   = useState(null);
+  const [explorerLevel, setExplorerLevel] = useState('org');
+
+  const currentHierarchy = HIERARCHY_LEVELS.find(l => l.id === explorerLevel);
+
+  return (
+    <div className="space-y-5">
+
+      {/* ── Interactive Hierarchy Explorer ── */}
+      <InfoCard>
+        <SectionHeader icon={Layers} color="bg-blue-600" title="Snowflake Object Hierarchy"
+          subtitle="Click each level to explore what objects live there and the key SQL patterns." />
+
+        {/* Funnel / pyramid navigator */}
+        <div className="flex flex-col gap-1.5 mb-4">
+          {HIERARCHY_LEVELS.map((lvl, i) => (
+            <button key={lvl.id} onClick={() => setExplorerLevel(lvl.id)}
+              style={{ marginLeft: `${i * 12}px`, marginRight: `${i * 12}px` }}
+              className={`rounded-xl border-2 px-4 py-3 flex items-center justify-between transition-all ${
+                explorerLevel === lvl.id
+                  ? `${lvl.light} ${lvl.border} shadow-md`
+                  : 'border-slate-100 bg-slate-50 hover:bg-slate-100'
+              }`}>
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">{lvl.emoji}</span>
+                <span className={`font-bold text-sm ${explorerLevel === lvl.id ? lvl.text : 'text-slate-700'}`}>
+                  {lvl.label}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full text-white hidden sm:block ${lvl.bg}`}>
+                  Level {i + 1}
+                </span>
+                <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${explorerLevel === lvl.id ? 'rotate-90' : ''}`} />
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {/* Level detail panel */}
+        {currentHierarchy && (
+          <div className={`rounded-xl border-2 ${currentHierarchy.border} ${currentHierarchy.light} p-5 space-y-4`}>
+            <p className={`text-sm leading-relaxed ${currentHierarchy.text}`}>{currentHierarchy.desc}</p>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Contains</p>
+              <div className="flex flex-wrap gap-1.5">
+                {currentHierarchy.objects.map((o, i) => (
+                  <span key={i} className={`text-xs px-2.5 py-1 rounded-full border font-medium ${currentHierarchy.light} ${currentHierarchy.border} ${currentHierarchy.text}`}>
+                    {o}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <CodeBlock code={currentHierarchy.code} />
+          </div>
+        )}
+
+        <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-xl p-3">
+          <p className="text-xs font-bold text-yellow-700 mb-1">⚡ Exam Tip — Hierarchy</p>
+          <ul className="text-xs text-yellow-700 space-y-1 list-disc pl-4">
+            <li><strong>Organization → Account → Database → Schema → Object</strong> — memorize this chain.</li>
+            <li>Account is the <strong>primary billing and security boundary</strong> in Snowflake.</li>
+            <li>Every database automatically gets a <strong>PUBLIC schema</strong> and an <strong>INFORMATION_SCHEMA</strong>.</li>
+            <li>Account-level objects (warehouses, users, roles) are <strong>not inside</strong> any database.</li>
+          </ul>
+        </div>
+      </InfoCard>
+
+      {/* ── Database Objects Explorer ── */}
+      <InfoCard>
+        <SectionHeader icon={Database} color="bg-blue-600" title="Database Objects"
+          subtitle="Objects that live inside a schema. Click each card to see details and SQL patterns." />
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-4">
+          {DB_OBJECTS_DATA.map((obj) => (
+            <button key={obj.id} onClick={() => setActiveObj(activeObj === obj.id ? null : obj.id)}
+              className={`rounded-xl border text-left p-3 transition-all ${
+                activeObj === obj.id ? obj.color + ' shadow-md border-2' : 'border-slate-100 bg-slate-50 hover:border-blue-200'
+              }`}>
+              <p className="text-xl mb-1">{obj.emoji}</p>
+              <p className={`font-bold text-xs ${activeObj === obj.id ? obj.text : 'text-slate-800'}`}>{obj.label}</p>
+              <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-2 leading-snug">{obj.desc.split('.')[0]}.</p>
+            </button>
+          ))}
+        </div>
+
+        {/* Expanded object detail */}
+        {activeObj && (() => {
+          const obj = DB_OBJECTS_DATA.find(o => o.id === activeObj);
+          return (
+            <div className={`rounded-xl border-2 p-5 space-y-3 ${obj.color}`}>
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">{obj.emoji}</span>
+                <div>
+                  <p className={`font-bold text-base ${obj.text}`}>{obj.label}</p>
+                  <p className="text-xs text-slate-500">{obj.desc}</p>
+                </div>
+              </div>
+              {obj.subtypes.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Subtypes / Variants</p>
+                  <div className="space-y-1">
+                    {obj.subtypes.map((s, i) => (
+                      <div key={i} className="flex items-start gap-2 text-xs bg-white/70 rounded-lg px-3 py-2">
+                        <CheckCircle className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${obj.text}`} />
+                        <span><strong>{s.name}</strong> — {s.note}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <CodeBlock code={obj.code} />
+            </div>
+          );
+        })()}
+      </InfoCard>
+
+      {/* ── Parameter Hierarchy ── */}
+      <InfoCard>
+        <SectionHeader icon={Shield} color="bg-blue-600" title="Parameter Hierarchy & Precedence"
+          subtitle="Parameters cascade from account → user → session → object. Lower levels override higher ones." />
+
+        {/* Precedence cascade visual */}
+        <div className="flex flex-col gap-1 mb-4">
+          {PARAM_LEVELS.map((lvl, i) => (
+            <div key={lvl.id}>
+              <button onClick={() => setActiveParam(activeParam === lvl.id ? null : lvl.id)}
+                className={`w-full rounded-xl border-2 px-4 py-3 flex items-center justify-between transition-all ${
+                  activeParam === lvl.id ? `${lvl.light} ${lvl.border} shadow-md` : 'border-slate-100 bg-slate-50 hover:bg-slate-100'
+                }`}>
+                <div className="flex items-center gap-3">
+                  <span className={`text-xs font-bold px-2 py-1 rounded-full text-white ${lvl.bg}`}>P{i + 1}</span>
+                  <span className="text-lg">{lvl.emoji}</span>
+                  <div className="text-left">
+                    <p className={`font-bold text-sm ${activeParam === lvl.id ? lvl.text : 'text-slate-800'}`}>{lvl.label}</p>
+                    <p className="text-xs text-slate-400">{lvl.who}</p>
+                  </div>
+                </div>
+                <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${activeParam === lvl.id ? 'rotate-90' : ''}`} />
+              </button>
+              {i < PARAM_LEVELS.length - 1 && (
+                <div className="flex justify-center my-0.5">
+                  <span className="text-xs text-slate-400 font-bold">↓ overridden by</span>
+                </div>
+              )}
+              {activeParam === lvl.id && (
+                <div className={`rounded-xl border-2 ${lvl.border} ${lvl.light} p-4 space-y-3 mt-1`}>
+                  <p className={`text-sm ${lvl.text}`}>{lvl.scope}</p>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Example parameters</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {lvl.examples.map((e, j) => (
+                        <code key={j} className={`text-[10px] px-2 py-1 rounded-lg border font-mono ${lvl.light} ${lvl.border} ${lvl.text}`}>{e}</code>
+                      ))}
+                    </div>
+                  </div>
+                  <CodeBlock code={lvl.code} />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-3">
+          <p className="text-xs font-bold text-blue-800 mb-2">📐 Precedence Rule</p>
+          <p className="text-xs text-blue-700 leading-relaxed">
+            <strong>Object</strong> overrides <strong>Session</strong> overrides <strong>User</strong> overrides <strong>Account</strong>.
+            The most specific level always wins. A parameter set at the session level temporarily overrides
+            what was set at the account or user level — but only for the duration of that session.
+          </p>
+        </div>
+
+        <CodeBlock code={`-- View parameters at different scopes
+SHOW PARAMETERS IN ACCOUNT;
+SHOW PARAMETERS IN SESSION;
+SHOW PARAMETERS IN USER analyst;
+SHOW PARAMETERS IN WAREHOUSE compute_wh;
+SHOW PARAMETERS IN TABLE orders;
+
+-- Check a specific parameter
+SHOW PARAMETERS LIKE 'TIMEZONE' IN ACCOUNT;`} />
+
+        <div className="mt-3 bg-yellow-50 border border-yellow-200 rounded-xl p-3">
+          <p className="text-xs font-bold text-yellow-700 mb-1">⚡ Exam Tip — Parameters</p>
+          <ul className="text-xs text-yellow-700 space-y-1 list-disc pl-4">
+            <li>Three parameter types: <strong>Account</strong>, <strong>Session</strong>, and <strong>Object</strong>.</li>
+            <li>Session parameters can be set at Account, User, <em>or</em> Session level — the lowest wins.</li>
+            <li><code>ALTER SESSION SET</code> = temporary. <code>ALTER ACCOUNT SET</code> = persistent default for all.</li>
+            <li><code>SHOW PARAMETERS IN SESSION</code> reveals the currently active value for every parameter.</li>
+          </ul>
+        </div>
+      </InfoCard>
+
+      {/* ── Context Functions ── */}
+      <InfoCard>
+        <SectionHeader icon={Search} color="bg-blue-600" title="Context & Session Functions"
+          subtitle="Built-in functions that return metadata about the current session — commonly tested." />
+        <div className="grid sm:grid-cols-2 gap-2 mb-3">
+          {CONTEXT_FUNCTIONS.map((f, i) => (
+            <div key={i} className="flex items-start gap-2 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
+              <code className="text-xs font-mono text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded whitespace-nowrap flex-shrink-0">{f.fn}</code>
+              <span className="text-xs text-slate-600">{f.desc}</span>
+            </div>
+          ))}
+        </div>
+        <CodeBlock code={`-- Common session context query
+SELECT
+  CURRENT_ACCOUNT()          AS account,
+  CURRENT_ORGANIZATION_NAME() AS org,
+  CURRENT_USER()             AS active_user,
+  CURRENT_ROLE()             AS active_role,
+  CURRENT_DATABASE()         AS active_db,
+  CURRENT_SCHEMA()           AS active_schema,
+  CURRENT_WAREHOUSE()        AS active_wh,
+  CURRENT_TIMESTAMP()        AS now;`} />
+      </InfoCard>
+
+      <ExamTip>
+        <p>Hierarchy: <strong>Organization → Account → Database → Schema → Object</strong>. Account is the billing and security boundary.</p>
+        <p>Object precedence: <strong>Object &gt; Session &gt; User &gt; Account</strong> — most specific level always wins.</p>
+        <p><strong>Stages</strong> (for loading), <strong>Pipes</strong> (Snowpipe auto-ingest), <strong>Shares</strong> (zero-copy sharing), and <strong>Sequences</strong> (unique IDs) all live in a schema.</p>
+        <p>Stored procs run with <strong>owner's rights by default</strong> — callers get the proc owner's privileges, not their own.</p>
+        <p>UDFs return values; they <strong>cannot execute DML</strong>. Stored procs can execute DML.</p>
+      </ExamTip>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LEARNING TAB 4 — 1.5 Storage Concepts
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const CodeBlock = ({ code }) => (
@@ -1053,6 +1606,8 @@ const QUIZ_SECTIONS = [
   { id: 'editions', label: 'Editions Quiz',     emoji: '🏷️', desc: '1.1 — Match features to the right Snowflake edition' },
   { id: 'horizon',  label: 'Horizon Pillars',   emoji: '🌐', desc: '1.1 — Sort capabilities into the right Horizon pillar' },
   { id: 'tools',    label: 'Tool Scenarios',    emoji: '🔌', desc: '1.2 — Pick the right tool for each scenario' },
+  { id: 'obj_sort', label: 'Object Sorter',     emoji: '📦', desc: '1.3 — Place objects in the correct hierarchy level' },
+  { id: 'obj_mcq',  label: 'Object Types MCQ',  emoji: '🔢', desc: '1.3 — Stages, pipes, UDFs, params, context functions' },
   { id: 'storage',  label: 'Storage Concepts',  emoji: '🗄️', desc: '1.5 — Micro-partitions, table types, clustering, views' },
 ];
 
@@ -1087,6 +1642,8 @@ const QuizTab = () => {
       {active === 'editions' && <EditionsQuiz />}
       {active === 'horizon'  && <HorizonSortGame />}
       {active === 'tools'    && <ToolScenarioGame />}
+      {active === 'obj_sort' && <ObjectsSortGame />}
+      {active === 'obj_mcq'  && <ObjectsMCQChallenge />}
       {active === 'storage'  && <StorageChallenge />}
     </div>
   );
@@ -1542,6 +2099,299 @@ const ToolScenarioGame = () => {
         )}
       </InfoCard>
     </div>
+  );
+};
+
+// ── Challenge 4: Object Hierarchy Sorter ─────────────────────────────────────
+const OBJ_LEVEL_DATA = [
+  { id: 'org',     label: 'Organization', emoji: '🌐', color: 'bg-violet-600', light: 'bg-violet-50', border: 'border-violet-300', text: 'text-violet-800' },
+  { id: 'account', label: 'Account',      emoji: '🏢', color: 'bg-blue-600',   light: 'bg-blue-50',   border: 'border-blue-300',   text: 'text-blue-800' },
+  { id: 'db',      label: 'Database',     emoji: '🗄️', color: 'bg-teal-600',   light: 'bg-teal-50',   border: 'border-teal-300',   text: 'text-teal-800' },
+  { id: 'schema',  label: 'Schema',       emoji: '📂', color: 'bg-slate-600',  light: 'bg-slate-100', border: 'border-slate-300',  text: 'text-slate-800' },
+];
+
+const OBJ_SORT_CARDS = [
+  { id: 'o1',  text: 'Replication group',             level: 'org',     hint: 'Replication groups are organization-level objects used for cross-account DR.' },
+  { id: 'o2',  text: 'Virtual warehouse',              level: 'account', hint: 'Warehouses are account-level — they are not inside any database.' },
+  { id: 'o3',  text: 'User',                           level: 'account', hint: 'Users live at the account level, not inside a database.' },
+  { id: 'o4',  text: 'Role',                           level: 'account', hint: 'Roles are account-level security objects.' },
+  { id: 'o5',  text: 'Network policy',                 level: 'account', hint: 'Network policies are account-level governance objects.' },
+  { id: 'o6',  text: 'Schema',                         level: 'db',      hint: 'Schemas are database-level objects — they live inside a database.' },
+  { id: 'o7',  text: 'INFORMATION_SCHEMA',             level: 'db',      hint: 'INFORMATION_SCHEMA is auto-created in every database.' },
+  { id: 'o8',  text: 'Stage',                          level: 'schema',  hint: 'Stages (named stages) are schema-level objects.' },
+  { id: 'o9',  text: 'Pipe',                           level: 'schema',  hint: 'Pipes are schema-level objects that power Snowpipe.' },
+  { id: 'o10', text: 'File format',                    level: 'schema',  hint: 'File formats are schema-level, reusable across COPY commands.' },
+  { id: 'o11', text: 'Stored procedure',               level: 'schema',  hint: 'Stored procedures live in a schema.' },
+  { id: 'o12', text: 'UDF',                            level: 'schema',  hint: 'User-Defined Functions are schema-level objects.' },
+  { id: 'o13', text: 'Share',                          level: 'account', hint: 'Shares are account-level objects — you share from account to account.' },
+  { id: 'o14', text: 'Resource monitor',               level: 'account', hint: 'Resource monitors are account-level cost control objects.' },
+  { id: 'o15', text: 'Sequence',                       level: 'schema',  hint: 'Sequences are schema-level objects for generating unique integers.' },
+];
+
+const ObjectsSortGame = () => {
+  const [assignments, setAssignments] = useState({});
+  const [selected,    setSelected]    = useState(null);
+  const [revealed,    setRevealed]    = useState(false);
+
+  const score = Object.entries(assignments).filter(([cid, lid]) =>
+    OBJ_SORT_CARDS.find(c => c.id === cid)?.level === lid
+  ).length;
+
+  const reset       = () => { setAssignments({}); setSelected(null); setRevealed(false); };
+  const unassigned  = OBJ_SORT_CARDS.filter(c => !assignments[c.id]);
+  const pickCard    = id  => setSelected(selected === id ? null : id);
+  const dropOnLevel = lid => {
+    if (!selected || revealed) return;
+    setAssignments(p => ({ ...p, [selected]: lid }));
+    setSelected(null);
+  };
+  const removeCard  = cid => {
+    if (revealed) return;
+    setAssignments(p => { const n = { ...p }; delete n[cid]; return n; });
+  };
+
+  return (
+    <InfoCard>
+      <div className="flex items-center justify-between mb-1">
+        <h3 className="font-bold text-slate-800">Object Hierarchy Sorter</h3>
+        <button onClick={reset} className="flex items-center gap-1 text-xs text-violet-600 hover:text-violet-800 font-semibold">
+          <RefreshCw className="w-3 h-3" /> Reset
+        </button>
+      </div>
+      <p className="text-xs text-slate-400 mb-4">
+        <strong>Step 1:</strong> Click an object to select it (turns violet).&nbsp;
+        <strong>Step 2:</strong> Click the hierarchy level it belongs to. Click a placed chip to remove it.
+        {revealed && <span className="ml-2 font-bold text-violet-700">Score: {score}/{OBJ_SORT_CARDS.length}</span>}
+      </p>
+
+      {unassigned.length > 0 && (
+        <div className="mb-4 p-3 bg-slate-50 rounded-xl border border-slate-200">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Objects to sort — {unassigned.length} remaining</p>
+          <div className="flex flex-wrap gap-2">
+            {unassigned.map(c => (
+              <button key={c.id} onClick={() => pickCard(c.id)}
+                className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${
+                  selected === c.id
+                    ? 'bg-violet-600 text-white border-violet-600 shadow-md scale-105'
+                    : 'bg-white text-slate-700 border-slate-200 hover:border-violet-300 hover:bg-violet-50'
+                }`}>{c.text}</button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="grid sm:grid-cols-2 gap-3 mb-4">
+        {OBJ_LEVEL_DATA.map(lvl => {
+          const here = OBJ_SORT_CARDS.filter(c => assignments[c.id] === lvl.id);
+          return (
+            <div key={lvl.id} onClick={() => dropOnLevel(lvl.id)}
+              className={`rounded-xl border-2 p-3 min-h-[90px] transition-all ${
+                selected ? `${lvl.border} ${lvl.light} shadow-md cursor-pointer` : 'border-slate-200 bg-slate-50'
+              }`}>
+              <p className={`text-xs font-bold mb-2 ${lvl.text}`}>{lvl.emoji} {lvl.label}</p>
+              <div className="flex flex-wrap gap-1">
+                {here.map(c => {
+                  const ok = c.level === lvl.id;
+                  return (
+                    <span key={c.id} onClick={e => { e.stopPropagation(); removeCard(c.id); }}
+                      title="Click to remove"
+                      className={`text-[10px] px-2 py-1 rounded-full border cursor-pointer transition-all ${
+                        revealed
+                          ? ok ? 'bg-emerald-100 border-emerald-400 text-emerald-800' : 'bg-red-100 border-red-300 text-red-700 line-through'
+                          : 'bg-white border-slate-300 text-slate-700 hover:bg-red-50 hover:border-red-300'
+                      }`}>{c.text}</span>
+                  );
+                })}
+              </div>
+              {selected && here.length === 0 && (
+                <p className={`text-[10px] italic ${lvl.text} opacity-40`}>Drop here</p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {!revealed ? (
+        <button onClick={() => setRevealed(true)}
+          disabled={Object.keys(assignments).length < OBJ_SORT_CARDS.length}
+          className="w-full bg-violet-600 hover:bg-violet-700 disabled:bg-violet-200 text-white font-bold py-3 rounded-xl text-sm transition-colors">
+          Check Answers ({Object.keys(assignments).length}/{OBJ_SORT_CARDS.length} sorted)
+        </button>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-center font-bold text-slate-700 text-lg">
+            {score === OBJ_SORT_CARDS.length ? '🎉 Perfect!' : `${score}/${OBJ_SORT_CARDS.length} correct`}
+          </p>
+          {OBJ_SORT_CARDS.filter(c => assignments[c.id] !== c.level).map(c => (
+            <div key={c.id} className="text-xs bg-red-50 border border-red-200 rounded-lg p-2.5 text-red-700">
+              <span className="font-bold">"{c.text}"</span> → belongs to{' '}
+              <span className="font-bold text-violet-700">
+                {OBJ_LEVEL_DATA.find(l => l.id === c.level)?.emoji} {OBJ_LEVEL_DATA.find(l => l.id === c.level)?.label}
+              </span>. {c.hint}
+            </div>
+          ))}
+        </div>
+      )}
+    </InfoCard>
+  );
+};
+
+// ── Challenge 4b: Object Types MCQ ───────────────────────────────────────────
+const OBJECTS_MCQ_DATA = [
+  {
+    q: 'Which object powers Snowpipe\'s auto-ingest capability?',
+    options: ['Stage', 'Pipe', 'Stream', 'Task'],
+    answer: 'Pipe',
+    hint: 'Pipes define the COPY INTO statement and AUTO_INGEST = TRUE that drives Snowpipe.',
+  },
+  {
+    q: 'A Stored Procedure runs with whose privileges by default?',
+    options: ["Caller's role privileges", "Owner's role privileges", "SYSADMIN privileges", "PUBLIC role privileges"],
+    answer: "Owner's role privileges",
+    hint: "By default, stored procedures run with owner's rights — callers get the owner's privileges, not their own.",
+  },
+  {
+    q: 'What is the key difference between a UDF and a Stored Procedure?',
+    options: [
+      'UDFs support Python; stored procs do not',
+      'UDFs return a value but cannot execute DML; stored procs can',
+      'Stored procs are faster than UDFs',
+      'UDFs require a warehouse; stored procs do not',
+    ],
+    answer: 'UDFs return a value but cannot execute DML; stored procs can',
+    hint: 'UDFs = return values for use in SELECT. Stored procs = procedural logic including DML like INSERT/DELETE.',
+  },
+  {
+    q: 'Which stage prefix refers to the Table Stage for a table named "orders"?',
+    options: ['@~orders', '@%orders', '@#orders', '@orders'],
+    answer: '@%orders',
+    hint: '@%tablename is the table stage. @~ is the user stage. Named stages use @stagename.',
+  },
+  {
+    q: 'A Sequence in Snowflake guarantees values are…',
+    options: [
+      'Unique and gap-free',
+      'Unique but NOT gap-free',
+      'Sequential and always start from 1',
+      'Monotonically increasing per session only',
+    ],
+    answer: 'Unique but NOT gap-free',
+    hint: 'Sequences guarantee uniqueness but NOT gap-free ordering — concurrent transactions can cause gaps.',
+  },
+  {
+    q: 'Which parameter level has the highest precedence (overrides all others)?',
+    options: ['Account level', 'User level', 'Session level', 'Object level'],
+    answer: 'Object level',
+    hint: 'Object > Session > User > Account. The most specific setting always wins.',
+  },
+  {
+    q: 'What command temporarily overrides a parameter for the current connection only?',
+    options: ['ALTER ACCOUNT SET', 'ALTER USER SET', 'ALTER SESSION SET', 'SET PARAMETER'],
+    answer: 'ALTER SESSION SET',
+    hint: 'ALTER SESSION SET applies only to the current session — it is cleared when the session ends.',
+  },
+  {
+    q: 'A Share is created on which side of a data sharing relationship?',
+    options: ['Consumer side', 'Provider side', 'Both sides simultaneously', 'Marketplace side'],
+    answer: 'Provider side',
+    hint: 'The data provider creates the Share object, adds database/schema/table grants, then adds consumer accounts.',
+  },
+  {
+    q: 'What function returns the currently active role in the session?',
+    options: ['CURRENT_USER()', 'CURRENT_ROLE()', 'CURRENT_ACCOUNT()', 'SESSION_ROLE()'],
+    answer: 'CURRENT_ROLE()',
+    hint: 'CURRENT_ROLE() returns the active role. CURRENT_USER() returns the logged-in username.',
+  },
+  {
+    q: 'A Named Stage that points to an S3 bucket is known as a(n)…',
+    options: ['Internal stage', 'External stage', 'User stage', 'Cloud stage'],
+    answer: 'External stage',
+    hint: 'Named stages pointing to cloud storage (S3, Azure Blob, GCS) are called External stages.',
+  },
+  {
+    q: 'Which object type encapsulates a packaged application with a Streamlit UI built with the Native App Framework?',
+    options: ['UDF', 'Application', 'Stored Procedure', 'ML Model'],
+    answer: 'Application',
+    hint: 'Snowflake Native Apps are "Application" objects — they can include Streamlit UIs, procedures, and container services.',
+  },
+  {
+    q: 'INFORMATION_SCHEMA is automatically created in…',
+    options: ['Every account', 'Every database', 'Every schema', 'Every warehouse'],
+    answer: 'Every database',
+    hint: 'INFORMATION_SCHEMA is auto-created in every database and contains views for that database\'s metadata.',
+  },
+];
+
+const ObjectsMCQChallenge = () => {
+  const [answers,  setAnswers]  = useState({});
+  const [revealed, setRevealed] = useState(false);
+  const score = Object.entries(answers).filter(([qi, ans]) => ans === OBJECTS_MCQ_DATA[qi].answer).length;
+  const reset = () => { setAnswers({}); setRevealed(false); };
+
+  return (
+    <InfoCard>
+      <div className="flex items-center justify-between mb-1">
+        <h3 className="font-bold text-slate-800 flex items-center gap-2">
+          <HelpCircle className="w-5 h-5 text-violet-500" /> Object Types — Knowledge Check
+        </h3>
+        {revealed && (
+          <button onClick={reset} className="flex items-center gap-1 text-xs text-violet-600 hover:text-violet-800 font-semibold">
+            <RefreshCw className="w-3 h-3" /> Reset
+          </button>
+        )}
+      </div>
+      <p className="text-xs text-slate-400 mb-5">
+        Select the best answer. Answer all {OBJECTS_MCQ_DATA.length} to check your score.
+        {revealed && (
+          <span className="ml-2 font-bold text-violet-700">
+            Score: {score}/{OBJECTS_MCQ_DATA.length} {score / OBJECTS_MCQ_DATA.length >= 0.9 ? '🎉' : score / OBJECTS_MCQ_DATA.length >= 0.7 ? '👍' : '📚'}
+          </span>
+        )}
+      </p>
+      <div className="space-y-4">
+        {OBJECTS_MCQ_DATA.map((q, qi) => {
+          const picked = answers[qi];
+          return (
+            <div key={qi} className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+              <p className="text-sm font-semibold text-slate-800 mb-3">
+                <span className="text-violet-400 font-bold mr-1">{qi + 1}.</span> {q.q}
+              </p>
+              <div className="grid sm:grid-cols-2 gap-2">
+                {q.options.map(opt => {
+                  const isCorrect = opt === q.answer;
+                  const isPicked  = picked === opt;
+                  let cls = 'border-slate-200 bg-white text-slate-600 hover:border-violet-300 hover:bg-violet-50';
+                  if (revealed) {
+                    if (isCorrect)     cls = 'border-emerald-400 bg-emerald-50 text-emerald-800 font-bold';
+                    else if (isPicked) cls = 'border-red-300 bg-red-50 text-red-700 line-through opacity-60';
+                    else               cls = 'border-slate-100 bg-white text-slate-300 opacity-40';
+                  } else if (isPicked) cls = 'border-violet-400 bg-violet-50 text-violet-800 font-semibold';
+                  return (
+                    <button key={opt} disabled={revealed}
+                      onClick={() => setAnswers(p => ({ ...p, [qi]: opt }))}
+                      className={`text-xs px-3 py-2 rounded-lg border text-left transition-all ${cls}`}>
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+              {revealed && (
+                <p className={`text-xs mt-2 italic ${picked === q.answer ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {picked === q.answer ? '✓ Correct! ' : `✗ Answer: ${q.answer}. `}{q.hint}
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <button onClick={() => setRevealed(true)}
+        disabled={Object.keys(answers).length < OBJECTS_MCQ_DATA.length || revealed}
+        className="mt-5 w-full bg-violet-600 hover:bg-violet-700 disabled:bg-violet-200 text-white font-bold py-3 rounded-xl transition-colors text-sm">
+        {revealed
+          ? `Score: ${score}/${OBJECTS_MCQ_DATA.length} — hit Reset to try again`
+          : `Check Answers (${Object.keys(answers).length}/${OBJECTS_MCQ_DATA.length} answered)`}
+      </button>
+    </InfoCard>
   );
 };
 
