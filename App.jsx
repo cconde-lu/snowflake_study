@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Layers, Shield, Upload, Zap, Share2,
-  ChevronRight, Star, BookOpen, CheckCircle
+  ChevronRight, Star, BookOpen, CheckCircle, ClipboardList,
 } from 'lucide-react';
 
 import Domain1 from './domains/Domain1_Architecture.jsx';
@@ -9,6 +9,7 @@ import Domain2 from './domains/Domain2_Governance.jsx';
 import Domain3 from './domains/Domain3_DataLoading.jsx';
 import Domain4 from './domains/Domain4_Performance.jsx';
 import Domain5 from './domains/Domain5_Collaboration.jsx';
+import ExamPrep from './exam-prep/ExamPrep.jsx';
 
 // ─── Domain registry ──────────────────────────────────────────────────────────
 const DOMAINS = [
@@ -38,7 +39,14 @@ const DOMAINS = [
     shortLabel: 'Governance',
     icon: Shield,
     color: { bg: 'bg-violet-700', light: 'bg-violet-50', border: 'border-violet-200', text: 'text-violet-700', badge: 'bg-violet-100 text-violet-800' },
-    topics: ['RBAC & DAC', 'Authentication (MFA, SSO, OAuth)', 'Data masking & row access', 'Object tagging', 'Trust Center', 'Resource monitors'],
+    topics: [
+      '2.1 Security model (RBAC, DAC, network policies)',
+      '2.1 Authentication (MFA, SSO, OAuth, key-pair)',
+      '2.1 System-defined & custom roles, secondary roles',
+      '2.2 Data masking (column-level & row-level security)',
+      '2.2 Object tagging, Trust Center, encryption, replication',
+      '2.3 Resource monitors, credit usage, ACCOUNT_USAGE',
+    ],
     component: Domain2,
   },
   {
@@ -151,6 +159,37 @@ const WeightBar = () => (
 // ─── Root App ─────────────────────────────────────────────────────────────────
 const App = () => {
   const [activeDomain, setActiveDomain] = useState(null);
+  const [showExamPrep, setShowExamPrep] = useState(false);
+
+  // Exam Prep view
+  if (showExamPrep) {
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-12">
+        <header className="bg-slate-800 text-white p-4 sm:p-6 shadow-md">
+          <div className="max-w-5xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-cyan-500 p-2 rounded-xl">
+                <ClipboardList className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <p className="text-white/60 text-xs font-semibold uppercase tracking-wider">COF-C03 · Practice</p>
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Exam Prep</h1>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowExamPrep(false)}
+              className="bg-white/20 hover:bg-white/30 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors flex items-center gap-2"
+            >
+              ← Home
+            </button>
+          </div>
+        </header>
+        <main className="max-w-5xl mx-auto mt-6 px-4">
+          <ExamPrep />
+        </main>
+      </div>
+    );
+  }
 
   const domain = DOMAINS.find(d => d.id === activeDomain);
 
@@ -219,10 +258,48 @@ const App = () => {
         <WeightBar />
 
         <h2 className="text-lg font-bold text-slate-700 mb-4">Choose a Domain to Study</h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
           {DOMAINS.map(d => (
             <DomainCard key={d.id} domain={d} onEnter={setActiveDomain} />
           ))}
+        </div>
+
+        {/* Exam Prep card */}
+        <h2 className="text-lg font-bold text-slate-700 mb-4">Practice & Assessment</h2>
+        <div
+          className="bg-slate-800 rounded-2xl shadow-md hover:shadow-lg transition-all cursor-pointer group overflow-hidden"
+          onClick={() => setShowExamPrep(true)}
+        >
+          <div className="p-6 sm:flex items-center gap-6">
+            <div className="bg-cyan-500 p-4 rounded-2xl flex-shrink-0 mb-4 sm:mb-0 w-fit">
+              <ClipboardList className="w-8 h-8 text-white" />
+            </div>
+            <div className="flex-1">
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <h3 className="text-white text-xl font-extrabold">Exam Prep</h3>
+                <span className="bg-cyan-500/20 text-cyan-300 text-xs font-bold px-2.5 py-1 rounded-full">Daily Mocks</span>
+              </div>
+              <p className="text-slate-300 text-sm mb-3">
+                60-question timed mock exams following the real COF-C03 domain distribution.
+                A new set every day — max 30% overlap from the previous session.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                {[
+                  { label: '60 questions/day' },
+                  { label: '115 min clock' },
+                  { label: 'Real distribution' },
+                  { label: 'Full review & explanations' },
+                ].map(b => (
+                  <span key={b.label} className="bg-white/10 text-slate-300 text-[10px] font-semibold px-2.5 py-1 rounded-full">
+                    {b.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="hidden sm:flex items-center gap-2 text-cyan-400 font-bold text-sm group-hover:gap-3 transition-all flex-shrink-0">
+              Open <ChevronRight className="w-5 h-5" />
+            </div>
+          </div>
         </div>
       </main>
     </div>

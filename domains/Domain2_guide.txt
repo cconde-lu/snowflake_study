@@ -1,0 +1,40 @@
+Domain 2.0: Account Management and Data Governance
+
+2.1 Explain Snowflake security model and principles -- ✅
+    * Role-Based Access Control (RBAC) -- ✅
+    * Securable object hierarchy -- ✅
+    * Discretionary access control (DAC) -- ✅
+    * Network Policies -- ✅
+    * Authentication -- ✅
+        * Multi-Factor Authentication (MFA) -- ✅
+        * Federated Authentication -- ✅
+        * Single Sign-on (SSO) -- ✅
+        * OAuth -- ✅
+        * Key-pair authentication -- ✅
+    * System-defined roles -- ✅
+    * Functional roles -- ✅
+        * Account roles -- ✅
+        * Database roles -- ✅
+        * Custom roles -- ✅
+    * Secondary roles -- ✅
+    * Account identifiers -- ✅
+    * Logging and tracing -- ✅
+
+2.2 Define data governance features and how they are used -- ✅
+    * Data masking -- ✅
+        * Row-level security -- ✅
+        * Column-level security -- ✅
+    * Object tagging -- ✅
+    * Privacy policies -- ✅
+    * Trust Center -- ✅
+    * Encryption key management -- ✅
+    * Alerts -- ✅
+    * Notifications -- ✅
+    * Data replication and failover -- ✅
+    * Data lineage -- ✅
+
+2.3 Explain monitoring and cost management -- ✅
+    * Resource Monitors -- ✅
+        * Cost and warehouse monitoring -- ✅
+    * Calculating virtual warehouse credit usage -- ✅
+    * ACCOUNT_USAGE schema -- ✅
