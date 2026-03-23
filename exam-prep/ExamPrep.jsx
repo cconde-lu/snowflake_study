@@ -4,16 +4,7 @@ import {
   Clock, BarChart2, BookOpen, ChevronLeft, Award,
 } from 'lucide-react';
 
-// ── Day registry — add each new day file here ─────────────────────────────────
-import { DAY_META as D01_META, QUESTIONS as D01_Q } from './ExamDay01.js';
-import { DAY_META as D02_META, QUESTIONS as D02_Q } from './ExamDay02.js';
-
-const ALL_DAYS = [
-  { meta: D01_META, questions: D01_Q },
-  { meta: D02_META, questions: D02_Q },
-  // DAY 3: import { DAY_META as D03_META, QUESTIONS as D03_Q } from './ExamDay03.js';
-  //        { meta: D03_META, questions: D03_Q },
-];
+import { ALL_DAYS } from './question-registry.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const DOMAIN_COLORS = {

@@ -1,0 +1,26 @@
+Domain 3.0: Data Loading, Unloading, and Connectivity
+
+3.1 Perform data loading and unloading
+    * File formats
+    * Create and use stages
+        * Internal stages
+        * External stages
+        * Server-side encryption
+        * Directory tables
+    * COPY INTO command
+    * Error handling options
+
+3.2 Perform automated data ingestion
+    * Snowpipe
+    * Snowpipe streaming
+    * Streams
+    * Tasks
+    * Dynamic tables
+    * Openflow (Feature will not be tested until it's globally GA)
+
+3.3 Identify the different Snowflake Connectors and integrations
+    * Snowflake drivers
+    * Snowflake connectors
+    * Storage integration
+    * API integration
+    * Git integration

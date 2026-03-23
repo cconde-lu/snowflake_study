@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   Layers, Shield, Upload, Zap, Share2,
   ChevronRight, Star, BookOpen, CheckCircle, ClipboardList,
+  CreditCard,
 } from 'lucide-react';
 
 import Domain1 from './domains/Domain1_Architecture.jsx';
@@ -9,7 +10,9 @@ import Domain2 from './domains/Domain2_Governance.jsx';
 import Domain3 from './domains/Domain3_DataLoading.jsx';
 import Domain4 from './domains/Domain4_Performance.jsx';
 import Domain5 from './domains/Domain5_Collaboration.jsx';
-import ExamPrep from './exam-prep/ExamPrep.jsx';
+import ExamPrep  from './exam-prep/ExamPrep.jsx';
+import FlashCards from './exam-prep/FlashCards.jsx';
+import QuickQuiz  from './exam-prep/QuickQuiz.jsx';
 
 // ─── Domain registry ──────────────────────────────────────────────────────────
 const DOMAINS = [
@@ -57,7 +60,14 @@ const DOMAINS = [
     shortLabel: 'Data Loading',
     icon: Upload,
     color: { bg: 'bg-teal-700', light: 'bg-teal-50', border: 'border-teal-200', text: 'text-teal-700', badge: 'bg-teal-100 text-teal-800' },
-    topics: ['File formats', 'Stages (internal/external)', 'COPY INTO', 'Snowpipe & Snowpipe Streaming', 'Streams & Tasks', 'Connectors & integrations'],
+    topics: [
+      '3.1 File formats & stage types (internal/external)',
+      '3.1 COPY INTO command & error handling',
+      '3.2 Snowpipe & Snowpipe Streaming',
+      '3.2 Streams, Tasks & Dynamic Tables',
+      '3.3 Snowflake drivers & connectors',
+      '3.3 Storage, API & Git integrations',
+    ],
     component: Domain3,
   },
   {
@@ -68,7 +78,14 @@ const DOMAINS = [
     shortLabel: 'Performance',
     icon: Zap,
     color: { bg: 'bg-amber-600', light: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', badge: 'bg-amber-100 text-amber-800' },
-    topics: ['Query Profile & insights', 'Caching (result/metadata/warehouse)', 'Clustering keys', 'Materialized views', 'Search optimization', 'Semi-structured data'],
+    topics: [
+      '4.1 Query Profile & insights (spill, pruning, joins, queuing)',
+      '4.1 ACCOUNT_USAGE views & workload management',
+      '4.2 Query Acceleration & Search Optimization services',
+      '4.2 Clustering keys & materialized views',
+      '4.3 Caching (result / metadata / warehouse)',
+      '4.4 Transformation (structured, semi-structured, window fns)',
+    ],
     component: Domain4,
   },
   {
@@ -79,7 +96,14 @@ const DOMAINS = [
     shortLabel: 'Collaboration',
     icon: Share2,
     color: { bg: 'bg-rose-700', light: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-700', badge: 'bg-rose-100 text-rose-800' },
-    topics: ['Time Travel & Fail-safe', 'Secure Data Sharing', 'Cloning', 'Data clean rooms', 'Marketplace & listings', 'Native Apps'],
+    topics: [
+      '5.1 Time Travel (AT/BEFORE syntax, retention by edition)',
+      '5.1 Fail-safe, Zero-copy Cloning & table type comparison',
+      '5.1 Data replication & failover groups (BCDR)',
+      '5.2 Provider, Consumer & Reader accounts',
+      '5.2 Secure Data Sharing, resharing & data clean rooms',
+      '5.3 Marketplace listings (public/private) & Native Apps',
+    ],
     component: Domain5,
   },
 ];
@@ -158,10 +182,47 @@ const WeightBar = () => (
 
 // ─── Root App ─────────────────────────────────────────────────────────────────
 const App = () => {
-  const [activeDomain, setActiveDomain] = useState(null);
-  const [showExamPrep, setShowExamPrep] = useState(false);
+  const [activeDomain,    setActiveDomain]    = useState(null);
+  const [showExamPrep,    setShowExamPrep]    = useState(false);
+  const [showFlashCards,  setShowFlashCards]  = useState(false);
+  const [showQuickQuiz,   setShowQuickQuiz]   = useState(false);
 
-  // Exam Prep view
+  // ── Quick Study sub-views ──────────────────────────────────────────────────
+  const quickStudyView = showFlashCards ? 'flashcards' : showQuickQuiz ? 'quickquiz' : null;
+
+  if (quickStudyView) {
+    const isFlash = quickStudyView === 'flashcards';
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-12">
+        <header className={`${isFlash ? 'bg-cyan-700' : 'bg-slate-700'} text-white p-4 sm:p-6 shadow-md`}>
+          <div className="max-w-xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`${isFlash ? 'bg-cyan-500' : 'bg-slate-500'} p-2 rounded-xl`}>
+                {isFlash
+                  ? <CreditCard className="w-5 h-5 text-white" />
+                  : <Zap className="w-5 h-5 text-white" />}
+              </div>
+              <div>
+                <p className="text-white/60 text-xs font-semibold uppercase tracking-wider">COF-C03 · Quick Study</p>
+                <h1 className="text-xl font-bold">{isFlash ? 'Flashcards' : 'Quick Quiz'}</h1>
+              </div>
+            </div>
+            <button
+              onClick={() => { setShowFlashCards(false); setShowQuickQuiz(false); }}
+              className="bg-white/20 hover:bg-white/30 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+            >
+              ← Home
+            </button>
+          </div>
+        </header>
+        <main className="max-w-xl mx-auto mt-6 px-4">
+          {isFlash ? <FlashCards /> : <QuickQuiz />}
+        </main>
+      </div>
+    );
+  }
+
+  // ── Exam Prep view ─────────────────────────────────────────────────────────
   if (showExamPrep) {
     return (
       <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-12">
@@ -191,6 +252,7 @@ const App = () => {
     );
   }
 
+  // ── Domain view ────────────────────────────────────────────────────────────
   const domain = DOMAINS.find(d => d.id === activeDomain);
 
   if (activeDomain && domain) {
@@ -200,7 +262,6 @@ const App = () => {
 
     return (
       <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-12">
-        {/* Domain header */}
         <header className={`${c.bg} text-white p-4 sm:p-6 shadow-md`}>
           <div className="max-w-5xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -226,9 +287,9 @@ const App = () => {
     );
   }
 
+  // ── Home page ──────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-16">
-      {/* Global header */}
       <header className="bg-slate-900 text-white p-5 sm:p-8 shadow-lg">
         <div className="max-w-5xl mx-auto">
           <div className="flex items-center gap-4 mb-3">
@@ -264,8 +325,62 @@ const App = () => {
           ))}
         </div>
 
-        {/* Exam Prep card */}
+        {/* Practice & Assessment section */}
         <h2 className="text-lg font-bold text-slate-700 mb-4">Practice & Assessment</h2>
+
+        {/* Quick Study row */}
+        <div className="grid sm:grid-cols-2 gap-4 mb-4">
+
+          {/* Flashcards card */}
+          <div
+            className="bg-cyan-700 rounded-2xl shadow-md hover:shadow-lg transition-all cursor-pointer group overflow-hidden"
+            onClick={() => setShowFlashCards(true)}
+          >
+            <div className="p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="bg-white/20 p-2.5 rounded-xl flex-shrink-0">
+                  <CreditCard className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-white font-extrabold text-base leading-tight">Flashcards</h3>
+                  <p className="text-cyan-200 text-xs">Key concepts · flip to reveal</p>
+                </div>
+              </div>
+              <p className="text-cyan-100 text-xs mb-4 leading-relaxed">
+                106 curated cards covering key facts and exam traps across all 5 domains. Filter by domain, mark what you know.
+              </p>
+              <div className="flex items-center gap-2 text-white text-xs font-bold group-hover:gap-3 transition-all">
+                Open deck <ChevronRight className="w-4 h-4" />
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Quiz card */}
+          <div
+            className="bg-slate-700 rounded-2xl shadow-md hover:shadow-lg transition-all cursor-pointer group overflow-hidden"
+            onClick={() => setShowQuickQuiz(true)}
+          >
+            <div className="p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="bg-white/20 p-2.5 rounded-xl flex-shrink-0">
+                  <Zap className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-white font-extrabold text-base leading-tight">Quick Quiz</h3>
+                  <p className="text-slate-300 text-xs">10 questions · refreshes daily</p>
+                </div>
+              </div>
+              <p className="text-slate-300 text-xs mb-4 leading-relaxed">
+                A fresh set of 10 questions every day, drawn from all exam day pools. Same questions all day, new set tomorrow.
+              </p>
+              <div className="flex items-center gap-2 text-white text-xs font-bold group-hover:gap-3 transition-all">
+                Start quiz <ChevronRight className="w-4 h-4" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Exam Prep card */}
         <div
           className="bg-slate-800 rounded-2xl shadow-md hover:shadow-lg transition-all cursor-pointer group overflow-hidden"
           onClick={() => setShowExamPrep(true)}
@@ -284,15 +399,8 @@ const App = () => {
                 A new set every day — max 30% overlap from the previous session.
               </p>
               <div className="flex flex-wrap gap-3">
-                {[
-                  { label: '60 questions/day' },
-                  { label: '115 min clock' },
-                  { label: 'Real distribution' },
-                  { label: 'Full review & explanations' },
-                ].map(b => (
-                  <span key={b.label} className="bg-white/10 text-slate-300 text-[10px] font-semibold px-2.5 py-1 rounded-full">
-                    {b.label}
-                  </span>
+                {['60 questions/day', '115 min clock', 'Real distribution', 'Full review & explanations'].map(b => (
+                  <span key={b} className="bg-white/10 text-slate-300 text-[10px] font-semibold px-2.5 py-1 rounded-full">{b}</span>
                 ))}
               </div>
             </div>

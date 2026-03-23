@@ -1,0 +1,25 @@
+Domain 5.0: Data Collaboration
+
+5.1 Explain data collaboration and protection
+    * Data replication and failover
+    * Secure data sharing features
+    * Cloning
+    * Time Travel
+    * Fail-safe
+
+5.2 Explain Snowflake's data sharing capabilities
+    * Accounts
+        * Provider
+        * Consumer
+        * Reader accounts
+    * Secure Data Sharing
+    * Sharing and resharing
+    * Direct shares
+    * Data clean rooms
+
+5.3 Share data using the Snowflake Marketplace and listings
+    * Snowflake Marketplace
+    * Listings
+        * Private
+        * Public
+    * Native Apps

@@ -1,0 +1,34 @@
+Domain 4.0: Performance Optimization, Querying, and Transformation
+
+4.1 Evaluate query performance
+    * Query Performance Tuning
+        * Query Profile/Query insights
+            * Bytes spilled to storage
+            * Inefficient pruning
+            * Exploding joins
+            * Queuing
+    * SNOWFLAKE.ACCOUNT_USAGE views (Snowflake database views)
+        * Query attribution
+        * Query history
+    * Workload management best practices
+        * Grouping similar workloads
+
+4.2 Optimize query performance
+    * Query acceleration service
+    * Search optimization service
+    * Clustering keys
+    * Materialized views
+
+4.3 Use Snowflake caching
+    * Query result cache
+    * Metadata cache
+    * Warehouse cache
+
+4.4 Perform data transformation techniques
+    * Using data
+        * Structured
+        * Semi-structured
+        * Unstructured
+    * Aggregate functions
+    * Applying SQL for query optimization
+    * Window functions
