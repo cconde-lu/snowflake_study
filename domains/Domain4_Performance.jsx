@@ -400,7 +400,7 @@ CREATE WAREHOUSE bi_wh
       <ExamTip>
         <p>• <strong>Bytes spilled to remote storage</strong> = warehouse too small. Scale up first, then check clustering.</p>
         <p>• <strong>Inefficient pruning</strong>: check <code>partitions_scanned / partitions_total</code> in Query Profile — high ratio means missing or wrong clustering key.</p>
-        <p>• <strong>Exploding joins</strong>: output rows >> input rows in the join node. Deduplicate join keys before joining.</p>
+          <p>• <strong>Exploding joins</strong>: output rows {'>>'} input rows in the join node. Deduplicate join keys before joining.</p>
         <p>• <strong>Queuing</strong>: time shown as "Queued" in Profile — not a query problem, a concurrency problem. Solution: multi-cluster warehouse or workload separation.</p>
         <p>• <strong>UNION without ALL</strong>: adds an extra Aggregate node in the Query Profile to deduplicate — use UNION ALL unless deduplication is required.</p>
         <p>• <strong>ACCOUNT_USAGE</strong> views: 45 min–8 h latency (QUERY_ATTRIBUTION_HISTORY = 8 h), 1-year retention. <strong>INFORMATION_SCHEMA</strong>: real-time, 7–14 day retention.</p>
