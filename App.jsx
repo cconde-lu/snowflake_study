@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   Layers, Shield, Upload, Zap, Share2,
   ChevronRight, Star, BookOpen, CheckCircle, ClipboardList,
-  CreditCard,
+  CreditCard, GraduationCap,
 } from 'lucide-react';
 
 import Domain1 from './domains/Domain1_Architecture.jsx';
@@ -10,9 +10,10 @@ import Domain2 from './domains/Domain2_Governance.jsx';
 import Domain3 from './domains/Domain3_DataLoading.jsx';
 import Domain4 from './domains/Domain4_Performance.jsx';
 import Domain5 from './domains/Domain5_Collaboration.jsx';
-import ExamPrep  from './exam-prep/ExamPrep.jsx';
-import FlashCards from './exam-prep/FlashCards.jsx';
-import QuickQuiz  from './exam-prep/QuickQuiz.jsx';
+import ExamPrep     from './exam-prep/ExamPrep.jsx';
+import FlashCards   from './exam-prep/FlashCards.jsx';
+import QuickQuiz    from './exam-prep/QuickQuiz.jsx';
+import StudySession from './exam-prep/StudySession.jsx';
 
 // ─── Domain registry ──────────────────────────────────────────────────────────
 const DOMAINS = [
@@ -182,41 +183,49 @@ const WeightBar = () => (
 
 // ─── Root App ─────────────────────────────────────────────────────────────────
 const App = () => {
-  const [activeDomain,    setActiveDomain]    = useState(null);
-  const [showExamPrep,    setShowExamPrep]    = useState(false);
-  const [showFlashCards,  setShowFlashCards]  = useState(false);
-  const [showQuickQuiz,   setShowQuickQuiz]   = useState(false);
+  const [activeDomain,      setActiveDomain]      = useState(null);
+  const [showExamPrep,      setShowExamPrep]      = useState(false);
+  const [showFlashCards,    setShowFlashCards]    = useState(false);
+  const [showQuickQuiz,     setShowQuickQuiz]     = useState(false);
+  const [showStudySession,  setShowStudySession]  = useState(false);
 
   // ── Quick Study sub-views ──────────────────────────────────────────────────
-  const quickStudyView = showFlashCards ? 'flashcards' : showQuickQuiz ? 'quickquiz' : null;
+  const quickStudyView = showFlashCards ? 'flashcards' : showQuickQuiz ? 'quickquiz' : showStudySession ? 'studysession' : null;
 
   if (quickStudyView) {
-    const isFlash = quickStudyView === 'flashcards';
+    const isFlash   = quickStudyView === 'flashcards';
+    const isStudy   = quickStudyView === 'studysession';
+    const headerBg  = isFlash ? 'bg-cyan-700' : isStudy ? 'bg-emerald-700' : 'bg-slate-700';
+    const iconBg    = isFlash ? 'bg-cyan-500'  : isStudy ? 'bg-emerald-500'  : 'bg-slate-500';
+    const title     = isFlash ? 'Flashcards'   : isStudy ? 'Study Session'   : 'Quick Quiz';
+
     return (
       <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-12">
-        <header className={`${isFlash ? 'bg-cyan-700' : 'bg-slate-700'} text-white p-4 sm:p-6 shadow-md`}>
-          <div className="max-w-xl mx-auto flex items-center justify-between">
+        <header className={`${headerBg} text-white p-4 sm:p-6 shadow-md`}>
+          <div className="max-w-2xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className={`${isFlash ? 'bg-cyan-500' : 'bg-slate-500'} p-2 rounded-xl`}>
+              <div className={`${iconBg} p-2 rounded-xl`}>
                 {isFlash
                   ? <CreditCard className="w-5 h-5 text-white" />
+                  : isStudy
+                  ? <GraduationCap className="w-5 h-5 text-white" />
                   : <Zap className="w-5 h-5 text-white" />}
               </div>
               <div>
-                <p className="text-white/60 text-xs font-semibold uppercase tracking-wider">COF-C03 · Quick Study</p>
-                <h1 className="text-xl font-bold">{isFlash ? 'Flashcards' : 'Quick Quiz'}</h1>
+                <p className="text-white/60 text-xs font-semibold uppercase tracking-wider">COF-C03 · Study Tools</p>
+                <h1 className="text-xl font-bold">{title}</h1>
               </div>
             </div>
             <button
-              onClick={() => { setShowFlashCards(false); setShowQuickQuiz(false); }}
+              onClick={() => { setShowFlashCards(false); setShowQuickQuiz(false); setShowStudySession(false); }}
               className="bg-white/20 hover:bg-white/30 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
             >
               ← Home
             </button>
           </div>
         </header>
-        <main className="max-w-xl mx-auto mt-6 px-4">
-          {isFlash ? <FlashCards /> : <QuickQuiz />}
+        <main className="max-w-2xl mx-auto mt-6 px-4">
+          {isFlash ? <FlashCards /> : isStudy ? <StudySession /> : <QuickQuiz />}
         </main>
       </div>
     );
@@ -329,7 +338,7 @@ const App = () => {
         <h2 className="text-lg font-bold text-slate-700 mb-4">Practice & Assessment</h2>
 
         {/* Quick Study row */}
-        <div className="grid sm:grid-cols-2 gap-4 mb-4">
+        <div className="grid sm:grid-cols-3 gap-4 mb-4">
 
           {/* Flashcards card */}
           <div
@@ -351,6 +360,30 @@ const App = () => {
               </p>
               <div className="flex items-center gap-2 text-white text-xs font-bold group-hover:gap-3 transition-all">
                 Open deck <ChevronRight className="w-4 h-4" />
+              </div>
+            </div>
+          </div>
+
+          {/* Study Session card */}
+          <div
+            className="bg-emerald-700 rounded-2xl shadow-md hover:shadow-lg transition-all cursor-pointer group overflow-hidden"
+            onClick={() => setShowStudySession(true)}
+          >
+            <div className="p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="bg-white/20 p-2.5 rounded-xl flex-shrink-0">
+                  <GraduationCap className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-white font-extrabold text-base leading-tight">Study Session</h3>
+                  <p className="text-emerald-200 text-xs">No timer · instant feedback</p>
+                </div>
+              </div>
+              <p className="text-emerald-100 text-xs mb-4 leading-relaxed">
+                Review concepts at your own pace. Filter by domain & difficulty, reveal answers immediately, mark what you know.
+              </p>
+              <div className="flex items-center gap-2 text-white text-xs font-bold group-hover:gap-3 transition-all">
+                Start reviewing <ChevronRight className="w-4 h-4" />
               </div>
             </div>
           </div>
