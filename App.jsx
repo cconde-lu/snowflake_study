@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   Layers, Shield, Upload, Zap, Share2,
   ChevronRight, Star, BookOpen, CheckCircle, ClipboardList,
-  CreditCard, GraduationCap,
+  CreditCard, GraduationCap, AlertTriangle,
 } from 'lucide-react';
 
 import Domain1 from './domains/Domain1_Architecture.jsx';
@@ -13,7 +13,8 @@ import Domain5 from './domains/Domain5_Collaboration.jsx';
 import ExamPrep     from './exam-prep/ExamPrep.jsx';
 import FlashCards   from './exam-prep/FlashCards.jsx';
 import QuickQuiz    from './exam-prep/QuickQuiz.jsx';
-import StudySession from './exam-prep/StudySession.jsx';
+import StudySession    from './exam-prep/StudySession.jsx';
+import TrapsAndGotchas from './exam-prep/TrapsAndGotchas.jsx';
 
 // ─── Domain registry ──────────────────────────────────────────────────────────
 const DOMAINS = [
@@ -188,28 +189,33 @@ const App = () => {
   const [showFlashCards,    setShowFlashCards]    = useState(false);
   const [showQuickQuiz,     setShowQuickQuiz]     = useState(false);
   const [showStudySession,  setShowStudySession]  = useState(false);
+  const [showTraps,         setShowTraps]         = useState(false);
 
   // ── Quick Study sub-views ──────────────────────────────────────────────────
-  const quickStudyView = showFlashCards ? 'flashcards' : showQuickQuiz ? 'quickquiz' : showStudySession ? 'studysession' : null;
+  const quickStudyView = showFlashCards ? 'flashcards'
+    : showQuickQuiz    ? 'quickquiz'
+    : showStudySession ? 'studysession'
+    : showTraps        ? 'traps'
+    : null;
 
   if (quickStudyView) {
     const isFlash   = quickStudyView === 'flashcards';
     const isStudy   = quickStudyView === 'studysession';
-    const headerBg  = isFlash ? 'bg-cyan-700' : isStudy ? 'bg-emerald-700' : 'bg-slate-700';
-    const iconBg    = isFlash ? 'bg-cyan-500'  : isStudy ? 'bg-emerald-500'  : 'bg-slate-500';
-    const title     = isFlash ? 'Flashcards'   : isStudy ? 'Study Session'   : 'Quick Quiz';
+    const isTraps   = quickStudyView === 'traps';
+    const headerBg  = isFlash ? 'bg-cyan-700' : isStudy ? 'bg-emerald-700' : isTraps ? 'bg-slate-900' : 'bg-slate-700';
+    const iconBg    = isFlash ? 'bg-cyan-500'  : isStudy ? 'bg-emerald-500'  : isTraps ? 'bg-red-500'   : 'bg-slate-500';
+    const title     = isFlash ? 'Flashcards'   : isStudy ? 'Study Session'   : isTraps ? 'Traps & Gotchas' : 'Quick Quiz';
 
     return (
       <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-12">
         <header className={`${headerBg} text-white p-4 sm:p-6 shadow-md`}>
-          <div className="max-w-2xl mx-auto flex items-center justify-between">
+          <div className="max-w-3xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className={`${iconBg} p-2 rounded-xl`}>
-                {isFlash
-                  ? <CreditCard className="w-5 h-5 text-white" />
-                  : isStudy
-                  ? <GraduationCap className="w-5 h-5 text-white" />
-                  : <Zap className="w-5 h-5 text-white" />}
+                {isFlash  ? <CreditCard className="w-5 h-5 text-white" />
+                : isStudy ? <GraduationCap className="w-5 h-5 text-white" />
+                : isTraps ? <AlertTriangle className="w-5 h-5 text-white" />
+                : <Zap className="w-5 h-5 text-white" />}
               </div>
               <div>
                 <p className="text-white/60 text-xs font-semibold uppercase tracking-wider">COF-C03 · Study Tools</p>
@@ -217,15 +223,15 @@ const App = () => {
               </div>
             </div>
             <button
-              onClick={() => { setShowFlashCards(false); setShowQuickQuiz(false); setShowStudySession(false); }}
+              onClick={() => { setShowFlashCards(false); setShowQuickQuiz(false); setShowStudySession(false); setShowTraps(false); }}
               className="bg-white/20 hover:bg-white/30 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
             >
               ← Home
             </button>
           </div>
         </header>
-        <main className="max-w-2xl mx-auto mt-6 px-4">
-          {isFlash ? <FlashCards /> : isStudy ? <StudySession /> : <QuickQuiz />}
+        <main className="max-w-3xl mx-auto mt-6 px-4">
+          {isFlash ? <FlashCards /> : isStudy ? <StudySession /> : isTraps ? <TrapsAndGotchas /> : <QuickQuiz />}
         </main>
       </div>
     );
@@ -409,6 +415,35 @@ const App = () => {
               <div className="flex items-center gap-2 text-white text-xs font-bold group-hover:gap-3 transition-all">
                 Start quiz <ChevronRight className="w-4 h-4" />
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Exam Prep card */}
+        <div
+          className="bg-slate-800 rounded-2xl shadow-md hover:shadow-lg transition-all cursor-pointer group overflow-hidden mb-4"
+          onClick={() => setShowTraps(true)}
+        >
+          <div className="p-5 sm:flex items-center gap-5">
+            <div className="bg-red-500 p-3 rounded-2xl flex-shrink-0 mb-3 sm:mb-0 w-fit">
+              <AlertTriangle className="w-6 h-6 text-white" />
+            </div>
+            <div className="flex-1">
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <h3 className="text-white text-base font-extrabold">Traps & Gotchas</h3>
+                <span className="bg-red-500/20 text-red-300 text-xs font-bold px-2.5 py-1 rounded-full">Reference Guide</span>
+              </div>
+              <p className="text-slate-300 text-xs mb-2">
+                10 trap categories + 5 high-miss patterns. What sounds right but isn't — misleading names, lookalike functions, policy bypasses, fake functions, exact numbers.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {['Misleading names', 'Fake functions', 'Privilege matrix', 'Sharing edge cases', 'Exact numbers'].map(b => (
+                  <span key={b} className="bg-white/10 text-slate-300 text-[10px] font-semibold px-2 py-0.5 rounded-full">{b}</span>
+                ))}
+              </div>
+            </div>
+            <div className="hidden sm:flex items-center gap-2 text-red-400 font-bold text-sm group-hover:gap-3 transition-all flex-shrink-0">
+              Study <ChevronRight className="w-5 h-5" />
             </div>
           </div>
         </div>
