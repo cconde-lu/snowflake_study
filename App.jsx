@@ -483,6 +483,9 @@ const App = () => {
         </div>
 
         {/* Exam Prep card */}
+        <div
+          className="bg-slate-800 rounded-2xl shadow-md hover:shadow-lg transition-all cursor-pointer group overflow-hidden"
+          onClick={() => setShowExamPrep(true)}
         >
           <div className="p-6 sm:flex items-center gap-6">
             <div className="bg-cyan-500 p-4 rounded-2xl flex-shrink-0 mb-4 sm:mb-0 w-fit">
