@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   Layers, Shield, Upload, Zap, Share2,
   ChevronRight, Star, BookOpen, CheckCircle, ClipboardList,
-  CreditCard, GraduationCap, AlertTriangle,
+  CreditCard, GraduationCap, AlertTriangle, Library,
 } from 'lucide-react';
 
 import Domain1 from './domains/Domain1_Architecture.jsx';
@@ -15,6 +15,7 @@ import FlashCards   from './exam-prep/FlashCards.jsx';
 import QuickQuiz    from './exam-prep/QuickQuiz.jsx';
 import StudySession    from './exam-prep/StudySession.jsx';
 import TrapsAndGotchas from './exam-prep/TrapsAndGotchas.jsx';
+import DomainStudyHub  from './exam-prep/DomainStudyHub.jsx';
 
 // ─── Domain registry ──────────────────────────────────────────────────────────
 const DOMAINS = [
@@ -190,21 +191,24 @@ const App = () => {
   const [showQuickQuiz,     setShowQuickQuiz]     = useState(false);
   const [showStudySession,  setShowStudySession]  = useState(false);
   const [showTraps,         setShowTraps]         = useState(false);
+  const [showDomainStudy,   setShowDomainStudy]   = useState(false);
 
   // ── Quick Study sub-views ──────────────────────────────────────────────────
   const quickStudyView = showFlashCards ? 'flashcards'
     : showQuickQuiz    ? 'quickquiz'
     : showStudySession ? 'studysession'
     : showTraps        ? 'traps'
+    : showDomainStudy  ? 'domainstudy'
     : null;
 
   if (quickStudyView) {
     const isFlash   = quickStudyView === 'flashcards';
     const isStudy   = quickStudyView === 'studysession';
     const isTraps   = quickStudyView === 'traps';
-    const headerBg  = isFlash ? 'bg-cyan-700' : isStudy ? 'bg-emerald-700' : isTraps ? 'bg-slate-900' : 'bg-slate-700';
-    const iconBg    = isFlash ? 'bg-cyan-500'  : isStudy ? 'bg-emerald-500'  : isTraps ? 'bg-red-500'   : 'bg-slate-500';
-    const title     = isFlash ? 'Flashcards'   : isStudy ? 'Study Session'   : isTraps ? 'Traps & Gotchas' : 'Quick Quiz';
+    const isDomain  = quickStudyView === 'domainstudy';
+    const headerBg  = isFlash ? 'bg-cyan-700' : isStudy ? 'bg-emerald-700' : isTraps ? 'bg-slate-900' : isDomain ? 'bg-indigo-700' : 'bg-slate-700';
+    const iconBg    = isFlash ? 'bg-cyan-500'  : isStudy ? 'bg-emerald-500'  : isTraps ? 'bg-red-500'   : isDomain ? 'bg-indigo-400' : 'bg-slate-500';
+    const title     = isFlash ? 'Flashcards'   : isStudy ? 'Study Session'   : isTraps ? 'Traps & Gotchas' : isDomain ? 'Domain Concept Review' : 'Quick Quiz';
 
     return (
       <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-12">
@@ -215,6 +219,7 @@ const App = () => {
                 {isFlash  ? <CreditCard className="w-5 h-5 text-white" />
                 : isStudy ? <GraduationCap className="w-5 h-5 text-white" />
                 : isTraps ? <AlertTriangle className="w-5 h-5 text-white" />
+                : isDomain ? <Library className="w-5 h-5 text-white" />
                 : <Zap className="w-5 h-5 text-white" />}
               </div>
               <div>
@@ -223,7 +228,7 @@ const App = () => {
               </div>
             </div>
             <button
-              onClick={() => { setShowFlashCards(false); setShowQuickQuiz(false); setShowStudySession(false); setShowTraps(false); }}
+              onClick={() => { setShowFlashCards(false); setShowQuickQuiz(false); setShowStudySession(false); setShowTraps(false); setShowDomainStudy(false); }}
               className="bg-white/20 hover:bg-white/30 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
             >
               ← Home
@@ -231,7 +236,7 @@ const App = () => {
           </div>
         </header>
         <main className="max-w-3xl mx-auto mt-6 px-4">
-          {isFlash ? <FlashCards /> : isStudy ? <StudySession /> : isTraps ? <TrapsAndGotchas /> : <QuickQuiz />}
+          {isFlash ? <FlashCards /> : isStudy ? <StudySession /> : isTraps ? <TrapsAndGotchas /> : isDomain ? <DomainStudyHub /> : <QuickQuiz />}
         </main>
       </div>
     );
@@ -448,10 +453,36 @@ const App = () => {
           </div>
         </div>
 
-        {/* Exam Prep card */}
+        {/* Domain Concept Review card */}
         <div
-          className="bg-slate-800 rounded-2xl shadow-md hover:shadow-lg transition-all cursor-pointer group overflow-hidden"
-          onClick={() => setShowExamPrep(true)}
+          className="bg-indigo-700 rounded-2xl shadow-md hover:shadow-lg transition-all cursor-pointer group overflow-hidden mb-4"
+          onClick={() => setShowDomainStudy(true)}
+        >
+          <div className="p-5 sm:flex items-center gap-5">
+            <div className="bg-white/20 p-3 rounded-2xl flex-shrink-0 mb-3 sm:mb-0 w-fit">
+              <Library className="w-6 h-6 text-white" />
+            </div>
+            <div className="flex-1">
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <h3 className="text-white text-base font-extrabold">Domain Concept Review</h3>
+                <span className="bg-white/20 text-indigo-100 text-xs font-bold px-2.5 py-1 rounded-full">Study Cards</span>
+              </div>
+              <p className="text-indigo-200 text-xs mb-2">
+                Key facts, reference tables, and exam traps for all 5 domains — organized by sub-domain. No questions, just concepts.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {['D1 Architecture', 'D2 Governance', 'D3 Loading', 'D4 Performance', 'D5 Collaboration'].map(b => (
+                  <span key={b} className="bg-white/10 text-indigo-200 text-[10px] font-semibold px-2 py-0.5 rounded-full">{b}</span>
+                ))}
+              </div>
+            </div>
+            <div className="hidden sm:flex items-center gap-2 text-indigo-200 font-bold text-sm group-hover:gap-3 transition-all flex-shrink-0">
+              Review <ChevronRight className="w-5 h-5" />
+            </div>
+          </div>
+        </div>
+
+        {/* Exam Prep card */}
         >
           <div className="p-6 sm:flex items-center gap-6">
             <div className="bg-cyan-500 p-4 rounded-2xl flex-shrink-0 mb-4 sm:mb-0 w-fit">

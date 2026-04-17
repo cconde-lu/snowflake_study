@@ -1,0 +1,1305 @@
+import React, { useState } from 'react';
+import { Layers, Shield, Upload, Zap, Share2, ChevronRight } from 'lucide-react';
+
+// ── Shared micro-components (mirror TrapsAndGotchas style) ─────────────────────
+const CompareTable = ({ headers, rows }) => (
+  <div className="overflow-x-auto mt-2">
+    <table className="w-full text-xs border-collapse">
+      <thead>
+        <tr>
+          {headers.map(h => (
+            <th key={h} className="bg-slate-100 text-slate-600 font-bold px-3 py-2 text-left border border-slate-200">{h}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row, i) => (
+          <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+            {row.map((cell, j) => (
+              <td key={j} className="px-3 py-2 border border-slate-200 text-slate-700 leading-snug">{cell}</td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+);
+
+const CodeSnip = ({ children }) => (
+  <pre className="bg-slate-900 text-emerald-300 text-xs rounded-xl p-4 overflow-x-auto leading-relaxed font-mono mt-2">
+    <code>{children}</code>
+  </pre>
+);
+
+const Pill = ({ label, active, onClick, color }) => (
+  <button
+    onClick={onClick}
+    className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap ${
+      active ? `${color} text-white shadow-sm` : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-400'
+    }`}
+  >
+    {label}
+  </button>
+);
+
+const Accordion = ({ title, badge, badgeColor = 'bg-slate-100 text-slate-600', children }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={`rounded-xl border transition-all ${open ? 'border-amber-300 bg-amber-50/40' : 'border-slate-200 bg-white'}`}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-3 p-4 text-left"
+      >
+        <ChevronRight className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
+        <span className="flex-1 font-semibold text-slate-800 text-sm">{title}</span>
+        {badge && (
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${badgeColor}`}>{badge}</span>
+        )}
+      </button>
+      {open && <div className="px-5 pb-5 space-y-3 text-sm">{children}</div>}
+    </div>
+  );
+};
+
+const Traps = ({ list }) => (
+  <div className="bg-red-50 border border-red-200 rounded-xl p-4 space-y-2">
+    <p className="text-xs font-extrabold text-red-700 uppercase tracking-wide mb-1">Common Traps</p>
+    {list.map((t, i) => (
+      <div key={i} className="flex items-start gap-2">
+        <span className="text-red-500 font-bold text-xs flex-shrink-0 mt-0.5">✗</span>
+        <p className="text-xs text-slate-700">{t}</p>
+      </div>
+    ))}
+  </div>
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DOMAIN 1: Architecture
+// ─────────────────────────────────────────────────────────────────────────────
+const D1_SECTIONS = [
+  {
+    id: '1.1',
+    label: '1.1 Architecture',
+    items: (
+      <div className="space-y-3">
+        <Accordion title="Three Architecture Layers" badge="Exam Fave" badgeColor="bg-blue-100 text-blue-700" defaultOpen>
+          <CompareTable
+            headers={['Layer', 'Responsibilities', 'Key Cache']}
+            rows={[
+              ['Cloud Services', 'Authentication, query optimization, metadata management, access control, result cache', 'Result Cache (persists after suspend)'],
+              ['Compute', 'Virtual warehouses execute queries. Each WH has its own SSD cache.', 'SSD Cache (wiped on suspend)'],
+              ['Storage', 'Centralized cloud storage. Micro-partitions (immutable, columnar, 50–500 MB uncompressed).', 'None'],
+            ]}
+          />
+          <Traps list={[
+            '"Which layer handles query optimization?" = Cloud Services — NOT compute',
+            '"Which layer stores the result cache?" = Cloud Services — it persists across warehouse suspend',
+            '"SSD cache survives suspend" = FALSE — completely wiped on suspend',
+          ]} />
+        </Accordion>
+
+        <Accordion title="Edition Matrix" badge="Memorize" badgeColor="bg-amber-100 text-amber-700">
+          <CompareTable
+            headers={['Feature', 'Standard', 'Enterprise', 'Biz Critical', 'VPS']}
+            rows={[
+              ['Multi-cluster WH', 'No', 'Yes', 'Yes', 'Yes'],
+              ['Time Travel 90 days', 'No (1 day max)', 'Yes', 'Yes', 'Yes'],
+              ['Materialized views', 'No', 'Yes', 'Yes', 'Yes'],
+              ['Dynamic data masking', 'No', 'Yes', 'Yes', 'Yes'],
+              ['Tri-Secret Secure', 'No', 'No', 'Yes', 'Yes'],
+              ['PrivateLink', 'No', 'No', 'Yes', 'Yes'],
+              ['HIPAA / PCI', 'No', 'No', 'Yes', 'Yes'],
+              ['Sharing via Support only', 'No', 'No', 'No', 'Yes'],
+            ]}
+          />
+          <Traps list={[
+            '"Standard Edition supports materialized views" = FALSE — Enterprise+',
+            '"Business Critical adds masking policies" = FALSE — Enterprise adds them',
+            '"All editions encrypt data at rest" = TRUE — AES-256 on all editions',
+          ]} />
+        </Accordion>
+      </div>
+    ),
+  },
+  {
+    id: '1.2',
+    label: '1.2 Interfaces',
+    items: (
+      <div className="space-y-3">
+        <Accordion title="Tools Reference" defaultOpen>
+          <CompareTable
+            headers={['Tool', 'Purpose']}
+            rows={[
+              ['Snowsight', 'Web UI for queries, dashboards, worksheets'],
+              ['SnowSQL', 'CLI for running SQL from terminal. Supports PUT/GET.'],
+              ['Snowflake CLI (snow)', 'CLI for managing objects, Streamlit, Notebooks'],
+              ['SnowCD', 'Connectivity diagnostic only (DNS, TLS, OCSP, proxy). Does NOT execute queries.'],
+              ['SQL API', 'REST API for programmatic SQL — OAuth or JWT only. No username/password.'],
+              ['JDBC / ODBC', 'Standard database drivers'],
+              ['Python Connector', 'Python-specific driver'],
+            ]}
+          />
+        </Accordion>
+        <Traps list={[
+          '"SnowCD executes queries" = FALSE — it only tests connectivity',
+          '"SQL API uses username/password" = FALSE — OAuth or JWT only',
+          '"PUT works from Snowsight" = FALSE — requires local filesystem (SnowSQL or drivers)',
+        ]} />
+      </div>
+    ),
+  },
+  {
+    id: '1.3',
+    label: '1.3 Objects',
+    items: (
+      <div className="space-y-3">
+        <Accordion title="Object Hierarchy" defaultOpen>
+          <CodeSnip>{`Organization\n  Account\n    Database\n      Schema\n        Table / View / Stage / Pipe / Stream / Task /\n        Sequence / UDF / Procedure / File Format / Share`}</CodeSnip>
+          <p className="text-xs font-bold text-slate-700 mt-3">Parameter Precedence (most specific wins):</p>
+          <CodeSnip>{`Object level > Session level > Account level\n-- Session TIMEOUT=60 beats Account TIMEOUT=300`}</CodeSnip>
+        </Accordion>
+        <Accordion title="Key Object Facts">
+          <CompareTable
+            headers={['Object', 'Key Fact']}
+            rows={[
+              ['Sequence', 'Unique values only — NOT gap-free or ordered across sessions'],
+              ['Pipe', 'Defines a COPY INTO for Snowpipe. Serverless compute.'],
+              ['Share', 'Contains references to objects. Consumer gets READ-ONLY access.'],
+              ['File Format', 'Named set of parse options (TYPE, DELIMITER, etc.). Reusable.'],
+            ]}
+          />
+        </Accordion>
+        <Traps list={[
+          '"Sequences guarantee sequential order" = FALSE — unique only, gaps possible',
+          '"Shares contain data copies" = FALSE — they contain references',
+        ]} />
+      </div>
+    ),
+  },
+  {
+    id: '1.4',
+    label: '1.4 Warehouses',
+    items: (
+      <div className="space-y-3">
+        <Accordion title="Credit Table" badge="Memorize" badgeColor="bg-amber-100 text-amber-700" defaultOpen>
+          <CompareTable
+            headers={['Size', 'Credits/Hour']}
+            rows={[
+              ['X-Small', '1'],
+              ['Small', '2'],
+              ['Medium', '4'],
+              ['Large', '8'],
+              ['X-Large', '16'],
+              ['2XL / 3XL / 4XL', '32 / 64 / 128'],
+            ]}
+          />
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-2 text-xs">
+            <p className="font-bold text-amber-700">Billing rules</p>
+            <p className="text-slate-700 mt-1">Per-second billing with <strong>60-second minimum per resume</strong>. Query count is irrelevant — only size and runtime matter.</p>
+            <p className="text-slate-700 mt-1"><strong>AUTO_SUSPEND = 0</strong> means NEVER auto-suspend (not "suspend immediately").</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Scaling Strategies">
+          <CompareTable
+            headers={['Strategy', 'When to Use', 'Mechanism']}
+            rows={[
+              ['Scale UP', 'Complex single query is slow', 'Increase warehouse size'],
+              ['Scale OUT', 'Many users queuing', 'Multi-cluster with auto-scaling'],
+              ['STANDARD policy', 'Adds cluster immediately on queue', 'More responsive, more credits'],
+              ['ECONOMY policy', 'Waits 6 min estimate before adding', 'Saves credits, more queuing'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Warehouse Types">
+          <CompareTable
+            headers={['Type', 'Use Case']}
+            rows={[
+              ['Standard (Gen 1/Gen 2)', 'General SQL queries'],
+              ['Snowpark-optimized', '16x memory. ML training, large UDFs, Snowpark DataFrames'],
+            ]}
+          />
+        </Accordion>
+
+        <Traps list={[
+          '"ECONOMY scaling reduces queuing" = FALSE — it INCREASES queuing',
+          '"Scale UP helps with concurrency" = FALSE — scale OUT helps concurrency',
+          '"Warehouse runs 45 seconds, billed 45 seconds" = FALSE — 60-second minimum',
+          '"AUTO_SUSPEND = 0 means suspend immediately" = FALSE — means NEVER suspend',
+          'ALLOW_OVERLAPPING_EXECUTION = FALSE (default): skips next run if current still running',
+        ]} />
+      </div>
+    ),
+  },
+  {
+    id: '1.5',
+    label: '1.5 Storage',
+    items: (
+      <div className="space-y-3">
+        <Accordion title="Micro-partitions" defaultOpen>
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs space-y-1">
+            <p>Immutable, columnar, 50–500 MB uncompressed</p>
+            <p>Metadata auto-stored: min/max per column, null count, distinct count</p>
+            <p>Cannot be manually defined or resized</p>
+          </div>
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-2 text-xs">
+            <p className="font-bold text-amber-700">Clustering Keys</p>
+            <p className="text-slate-700 mt-1">Best columns: DATE, TIMESTAMP, low-to-medium cardinality in WHERE/JOIN. Put <strong>lower cardinality first</strong> in multi-column keys.</p>
+            <p className="text-slate-700 mt-1">SYSTEM$CLUSTERING_INFORMATION: depth near 1 = well-clustered. High depth = reclustering needed.</p>
+            <p className="text-slate-700 mt-1">Automatic Clustering = serverless — NOT tracked by resource monitors.</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Table Types">
+          <CompareTable
+            headers={['Type', 'Time Travel', 'Fail-safe', 'Scope', 'Cloneable?']}
+            rows={[
+              ['Permanent', '0–90 days (Enterprise)', '7 days', 'Until dropped', 'Yes'],
+              ['Transient', '0–1 day', '0 days', 'Until dropped', 'Yes (must say TRANSIENT in clone DDL)'],
+              ['Temporary', '0–1 day', '0 days', 'Session only', 'Yes'],
+              ['External', 'N/A', 'N/A', 'Points to cloud storage', 'NO'],
+              ['Dynamic', 'Follows TARGET_LAG', 'Same as permanent', 'Until dropped', 'NO'],
+              ['Iceberg', 'Via external catalog', 'N/A', 'Customer-managed storage', 'Depends'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="View Types">
+          <CompareTable
+            headers={['Type', 'Key Fact']}
+            rows={[
+              ['Standard', 'Saved SQL. No storage. Definition visible to granted roles.'],
+              ['Materialized', 'Pre-computed. Serverless refresh. ONE table only (no JOINs). Enterprise+.'],
+              ['Secure', 'Hides definition from non-owners. Required for sharing. May reduce optimization.'],
+            ]}
+          />
+        </Accordion>
+
+        <Traps list={[
+          '"Materialized views support JOINs" = FALSE — single table only (use Dynamic Tables for JOINs)',
+          '"External tables support INSERT" = FALSE — read-only, SELECT only',
+          '"CREATE TABLE ... CLONE transient_table" = FAILS — must use CREATE TRANSIENT TABLE ... CLONE',
+          '"External tables are included in database clones" = FALSE — excluded entirely',
+          '"Internal stages can be cloned" = FALSE — external stages CAN',
+        ]} />
+      </div>
+    ),
+  },
+  {
+    id: '1.6',
+    label: '1.6 AI/ML',
+    items: (
+      <div className="space-y-3">
+        <Accordion title="Cortex AI & ML Functions" defaultOpen>
+          <CompareTable
+            headers={['Feature', 'What it Does']}
+            rows={[
+              ['SUMMARIZE, SENTIMENT, TRANSLATE, COMPLETE', 'Cortex LLM SQL functions — run directly in SQL'],
+              ['EXTRACT_ANSWER, CLASSIFY_TEXT', 'Cortex AI SQL functions'],
+              ['Cortex Analyst', 'Text-to-SQL via semantic model (YAML). Natural language → SQL.'],
+              ['Cortex Search', 'Hybrid search (keyword + vector) over text data'],
+              ['FORECAST', 'Time-series prediction — built-in serverless ML'],
+              ['ANOMALY_DETECTION', 'Outlier detection — built-in serverless ML'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Development Runtimes">
+          <CompareTable
+            headers={['Platform', 'Runs On', 'Key Fact']}
+            rows={[
+              ['Snowpark', 'Session warehouse', 'DataFrames are LAZY — execution runs on WH, not client. Python/Java/Scala.'],
+              ['Streamlit in Snowflake (SiS)', 'Snowflake-managed compute', 'Uses VIEWER\'s role and warehouse. NOT external Streamlit cloud.'],
+              ['Snowflake Notebooks', 'WH or Container Service', 'Interactive dev in Snowsight. Python + SQL cells.'],
+              ['Native Apps', 'Consumer\'s compute', 'Packaged (code + data) distributed via Marketplace. Installed in consumer account.'],
+            ]}
+          />
+        </Accordion>
+
+        <Traps list={[
+          '"Snowpark DataFrames execute on the client" = FALSE — runs on the warehouse',
+          '"SiS apps run on a dedicated Streamlit server" = FALSE — Snowflake-managed compute',
+          '"FORECAST is an external ML function" = FALSE — built-in ML function (no external infra)',
+        ]} />
+      </div>
+    ),
+  },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DOMAIN 2: Security & Governance
+// ─────────────────────────────────────────────────────────────────────────────
+const D2_SECTIONS = [
+  {
+    id: '2.1',
+    label: '2.1 Security',
+    items: (
+      <div className="space-y-3">
+        <Accordion title="RBAC + DAC Combined Model" defaultOpen>
+          <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 text-xs space-y-2">
+            <p><strong>RBAC:</strong> Privileges granted to roles → roles granted to users</p>
+            <p><strong>DAC:</strong> Each object has an owner. Owner decides who gets access.</p>
+            <p>Both work together — owner (DAC) grants privileges to roles (RBAC).</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="System Role Hierarchy" badge="Memorize" badgeColor="bg-violet-100 text-violet-700">
+          <CodeSnip>{`ACCOUNTADMIN -----> Billing, resource monitors, account settings\n  |-- SECURITYADMIN --> Manage grants on objects (GRANT SELECT, etc.)\n  |     |-- USERADMIN --> Create/manage users and roles\n  |-- SYSADMIN -------> Create databases, warehouses, schemas\nPUBLIC (all roles inherit this)`}</CodeSnip>
+          <CompareTable
+            headers={['Role', 'Creates', 'Manages', 'Cannot']}
+            rows={[
+              ['USERADMIN', 'Users, roles', 'Grant roles to users', 'Grant object privileges, create DBs'],
+              ['SECURITYADMIN', 'Everything USERADMIN +', 'Object-level grants (SELECT, etc.)', 'Create DBs/warehouses, view billing'],
+              ['SYSADMIN', 'Databases, warehouses, schemas', 'Database objects', 'Manage users, view billing'],
+              ['ACCOUNTADMIN', 'Resource monitors', 'Billing, account params', 'N/A (can do everything)'],
+              ['ORGADMIN', 'Accounts (org level)', 'Org usage, replication', 'Account-level admin within accounts'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Secondary Roles">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-2">
+            <p><code className="bg-slate-100 px-1 rounded">USE SECONDARY ROLES ALL</code> — activates all granted roles alongside primary</p>
+            <p>Without this, ONLY primary role privileges apply</p>
+            <p><code className="bg-slate-100 px-1 rounded">CURRENT_ROLE()</code> = primary only</p>
+            <p><code className="bg-slate-100 px-1 rounded">IS_ROLE_IN_SESSION()</code> = primary + secondary + inherited</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Authentication Methods">
+          <CompareTable
+            headers={['Method', 'Use Case', 'Key Fact']}
+            rows={[
+              ['Username/password', 'Interactive login', 'Basic, not for programmatic'],
+              ['MFA (Duo)', 'Interactive + extra security', 'Powered by Duo Security'],
+              ['SSO (SAML 2.0)', 'Browser-based federated', 'IdP: Okta, Azure AD, etc.'],
+              ['Key-pair (RSA)', 'Programmatic: connectors, Kafka', 'PUBLIC key to Snowflake — private stays local'],
+              ['OAuth', 'Programmatic: custom apps, SQL API', 'Token-based'],
+              ['SCIM', 'User/group provisioning', 'Automates lifecycle from IdP'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Network Policies">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-2">
+            <p><strong>BLOCKED takes precedence</strong> over ALLOWED (same IP in both = blocked)</p>
+            <p><strong>User-level OVERRIDES account-level</strong> — not additive, not merged</p>
+          </div>
+        </Accordion>
+
+        <Traps list={[
+          '"USERADMIN can grant SELECT on tables" = FALSE — that is SECURITYADMIN',
+          '"SECURITYADMIN creates databases" = FALSE — that is SYSADMIN',
+          '"ORGADMIN has ACCOUNTADMIN access within accounts" = FALSE — org-level only',
+          '"Custom role not granted to SYSADMIN — ACCOUNTADMIN can still see its objects" = FALSE',
+          '"Database roles work across databases" = FALSE — single database scope',
+          '"SQL API supports username/password" = FALSE — OAuth or JWT only',
+          '"Kafka connector uses OAuth" = FALSE — key-pair authentication',
+          '"RSA_PRIVATE_KEY is set on the Snowflake user" = FALSE — RSA_PUBLIC_KEY is set, private stays local',
+          '"SCIM provisions databases" = FALSE — provisions users and maps groups to roles',
+        ]} />
+      </div>
+    ),
+  },
+  {
+    id: '2.2',
+    label: '2.2 Governance',
+    items: (
+      <div className="space-y-3">
+        <Accordion title="Dynamic Data Masking" badge="Enterprise+" badgeColor="bg-violet-100 text-violet-700" defaultOpen>
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>Conditionally mask column values based on querying role</p>
+            <p><strong>NO ROLE BYPASSES</strong> masking policies — not even ACCOUNTADMIN</p>
+            <p>Use <code className="bg-slate-100 px-1 rounded">IS_ROLE_IN_SESSION()</code> (not CURRENT_ROLE) to capture secondary roles</p>
+            <p>Tag-based masking: attach policy to a tag → all tagged columns inherit automatically</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Row Access Policies" badge="Enterprise+" badgeColor="bg-violet-100 text-violet-700">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>Filter rows based on querying role</p>
+            <p><strong>NO ROLE BYPASSES</strong> row access policies</p>
+            <p>CASE with no ELSE = NULL = FALSE = <strong>0 rows</strong> for unmentioned roles</p>
+            <p>Can be applied to tables AND views</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Data Classification & Object Tagging">
+          <CompareTable
+            headers={['Feature', 'Key Fact']}
+            rows={[
+              ['Object Tagging', 'Tags are metadata labels only — no enforcement by themselves. Must attach masking policy to tag.'],
+              ['SYSTEM$CLASSIFY(table)', 'Analyzes content, assigns semantic + privacy tags. Supported: NUMBER, STRING, DATE, TIMESTAMP. NOT VARIANT/BINARY.'],
+              ['Projection policies', 'Control which roles can SELECT a column (not INSERT)'],
+              ['Aggregation policies', 'Require aggregation before returning data'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Encryption & Key Management">
+          <CompareTable
+            headers={['Edition', 'Encryption']}
+            rows={[
+              ['All editions', 'AES-256 at rest, TLS 1.2 in transit'],
+              ['Business Critical+', 'Tri-Secret Secure — customer-managed keys via cloud KMS'],
+            ]}
+          />
+          <p className="text-xs text-slate-600 mt-2">Key rotation: automatic (annual) + customer-triggered option.</p>
+        </Accordion>
+
+        <Accordion title="Data Lineage">
+          <CompareTable
+            headers={['View / Object', 'Purpose']}
+            rows={[
+              ['ACCESS_HISTORY', 'Which objects/columns were read/written by queries'],
+              ['OBJECT_DEPENDENCIES', 'View-to-table and other object references'],
+              ['Trust Center', 'Security scanners (CIS benchmarks, threat intelligence). Evaluates account posture.'],
+            ]}
+          />
+        </Accordion>
+
+        <Traps list={[
+          '"Tags enforce masking automatically" = FALSE — must attach policy to tag',
+          '"ACCOUNTADMIN bypasses masking" = FALSE',
+          '"Row access policy missing ELSE — unmentioned roles see all rows" = FALSE — 0 rows',
+          '"SYSTEM$CLASSIFY works on VARIANT columns" = FALSE — primitive types only',
+          '"Projection policy controls INSERT" = FALSE — controls SELECT/projection visibility',
+        ]} />
+      </div>
+    ),
+  },
+  {
+    id: '2.3',
+    label: '2.3 Monitoring',
+    items: (
+      <div className="space-y-3">
+        <Accordion title="Resource Monitors" defaultOpen>
+          <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 text-xs space-y-1">
+            <p><strong>Only ACCOUNTADMIN can CREATE</strong> — non-delegable</p>
+            <p>MONITOR privilege = view usage. MODIFY privilege = change properties.</p>
+            <p>Only track <strong>user-managed warehouse</strong> credits — NOT serverless</p>
+            <p>Serverless (Snowpipe, auto-clustering, MVs, SOS) requires <strong>budgets</strong></p>
+            <p>TRIGGERS clause in ALTER <strong>replaces</strong> all existing triggers (not additive)</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="ACCOUNT_USAGE vs INFORMATION_SCHEMA">
+          <CompareTable
+            headers={['Property', 'ACCOUNT_USAGE', 'INFORMATION_SCHEMA']}
+            rows={[
+              ['Latency', '45 min – 3 hours', 'Near real-time'],
+              ['Retention', '365 days', '7–14 days'],
+              ['Scope', 'Entire account', 'Current database only'],
+              ['Location', 'SNOWFLAKE database', 'Each database'],
+            ]}
+          />
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-2 text-xs">
+            <p className="font-bold text-amber-700">Key ACCOUNT_USAGE views</p>
+            <p className="text-slate-700 mt-1">QUERY_HISTORY, ACCESS_HISTORY, LOGIN_HISTORY, WAREHOUSE_METERING_HISTORY, TABLE_STORAGE_METRICS, GRANTS_TO_ROLES, GRANTS_TO_USERS</p>
+          </div>
+        </Accordion>
+
+        <Traps list={[
+          '"Resource monitors track Snowpipe credits" = FALSE — use budgets',
+          '"ALTER RESOURCE MONITOR without TRIGGERS keeps old triggers" = TRUE — but WITH TRIGGERS replaces all',
+          '"ACCOUNT_USAGE is real-time" = FALSE — 45 min – 3 hour latency',
+          '"INFORMATION_SCHEMA retains 365 days" = FALSE — 7–14 days only',
+        ]} />
+      </div>
+    ),
+  },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DOMAIN 3: Data Loading & Connectivity
+// ─────────────────────────────────────────────────────────────────────────────
+const D3_SECTIONS = [
+  {
+    id: '3.1',
+    label: '3.1 Loading',
+    items: (
+      <div className="space-y-3">
+        <Accordion title="File Formats Supported" defaultOpen>
+          <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 text-xs">
+            <p className="font-bold text-teal-700 mb-1">Supported: CSV, JSON, Avro, ORC, Parquet, XML</p>
+            <p className="text-red-700 font-semibold">NOT supported: Excel (.xlsx), PDF, binary — must convert first</p>
+          </div>
+          <CompareTable
+            headers={['Option', 'Format', 'What it Does']}
+            rows={[
+              ['STRIP_OUTER_ARRAY', 'JSON only', 'Remove outer [ ] so each element = 1 row'],
+              ['STRIP_NULL_VALUE', 'JSON', 'Convert JSON "null" to SQL NULL'],
+              ['FIELD_OPTIONALLY_ENCLOSED_BY', 'CSV only', 'Character wrapping field values (e.g., \'"\'  )'],
+              ['PARSE_HEADER', 'CSV', 'Read first row as column headers — enables MATCH_BY_COLUMN_NAME'],
+              ['SKIP_HEADER', 'CSV', 'Skip N rows — does NOT parse headers as names'],
+              ['ERROR_ON_COLUMN_COUNT_MISMATCH', 'CSV', 'Error if column counts differ (default TRUE)'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Stage Types">
+          <CompareTable
+            headers={['Type', 'Reference', 'Scope', 'Cloneable?']}
+            rows={[
+              ['User stage', '@~', 'Per user (auto-created)', 'No'],
+              ['Table stage', '@%table_name', 'Per table (auto-created)', 'No'],
+              ['Named internal', '@my_stage', 'User-created standalone', 'NO — "Unsupported feature" error'],
+              ['Named external', '@my_ext_stage', 'Points to S3/Azure/GCS', 'YES — metadata cloned'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="COPY INTO — Key Parameters">
+          <CodeSnip>{`-- Loading (stage to table)\nCOPY INTO my_table FROM @my_stage FILE_FORMAT = (TYPE=CSV)\n\n-- With transformations\nCOPY INTO my_table(col1, col2)\n  FROM (SELECT $1, UPPER($2) FROM @my_stage) FILE_FORMAT = (TYPE=CSV)\n\n-- Unloading (table to stage)\nCOPY INTO @my_stage FROM my_table FILE_FORMAT = (TYPE=PARQUET)`}</CodeSnip>
+          <CompareTable
+            headers={['Parameter', 'What it Does']}
+            rows={[
+              ['ON_ERROR', 'ABORT_STATEMENT (default bulk) / SKIP_FILE (default Snowpipe) / CONTINUE / SKIP_FILE_n'],
+              ['VALIDATION_MODE', 'Dry-run: RETURN_ALL_ERRORS, RETURN_n_ROWS — NO DATA LOADED'],
+              ['FORCE', 'Bypass metadata dedup. Reload already-loaded files. RISK: duplicates.'],
+              ['MATCH_BY_COLUMN_NAME', 'Match by name not position (CASE_SENSITIVE / CASE_INSENSITIVE)'],
+              ['PURGE', 'Delete files from stage after successful load'],
+              ['TRUNCATECOLUMNS', 'Truncate strings exceeding column length instead of erroring'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Load Metadata Dedup & METADATA$ Columns">
+          <CompareTable
+            headers={['Method', 'Retention', 'Consequence']}
+            rows={[
+              ['Bulk COPY INTO', '64 days', 'Files within 64 days are skipped (unless FORCE)'],
+              ['Snowpipe', '14 days', 'Files within 14 days are skipped'],
+            ]}
+          />
+          <CompareTable
+            headers={['Pseudo-column', 'Returns']}
+            rows={[
+              ['METADATA$FILENAME', 'Source filename'],
+              ['METADATA$FILE_ROW_NUMBER', 'Row number within the source file'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="PUT / GET / REMOVE">
+          <CompareTable
+            headers={['Command', 'Direction', 'Stage Type', 'Requires']}
+            rows={[
+              ['PUT', 'Local file → internal stage', 'Internal ONLY', 'Local filesystem (SnowSQL, drivers)'],
+              ['GET', 'Internal stage → local file', 'Internal ONLY', 'Local filesystem'],
+              ['REMOVE (RM)', 'Delete files from stage', 'Internal', 'N/A'],
+            ]}
+          />
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-2 text-xs space-y-1">
+            <p>PUT auto-compresses with gzip by default</p>
+            <p>PUT supports subfolder paths: @my_stage/2026/april/</p>
+            <p>PUT does NOT work from Snowsight (no local filesystem)</p>
+            <p>No RENAME or MOVE commands for staged files</p>
+          </div>
+        </Accordion>
+
+        <Traps list={[
+          '"STRIP_OUTER_ARRAY is for CSV" = FALSE — JSON only',
+          '"SKIP_HEADER = 1 enables MATCH_BY_COLUMN_NAME" = FALSE — need PARSE_HEADER = TRUE',
+          '"ON_ERROR default is the same for COPY and Snowpipe" = FALSE — ABORT vs SKIP_FILE',
+          '"VALIDATION_MODE loads data and returns errors" = FALSE — no data loaded (dry-run)',
+          '"FORCE = TRUE is safe" = FALSE — creates duplicate rows',
+          '"File loaded 50 days ago, COPY without FORCE: loads again" = FALSE — 50 < 64 → skipped',
+          '"File loaded via Snowpipe 10 days ago, same file re-arrives: loads again" = FALSE — 10 < 14 → skipped',
+          '"Internal stages can be cloned" = FALSE — external stages CAN',
+        ]} />
+      </div>
+    ),
+  },
+  {
+    id: '3.2',
+    label: '3.2 Automation',
+    items: (
+      <div className="space-y-3">
+        <Accordion title="Snowpipe & Snowpipe Streaming" defaultOpen>
+          <CompareTable
+            headers={['Feature', 'Key Facts']}
+            rows={[
+              ['Snowpipe', 'Serverless compute (no user warehouse). AUTO_INGEST=TRUE (cloud events) or REST API trigger.'],
+              ['Default ON_ERROR', 'SKIP_FILE — not ABORT_STATEMENT'],
+              ['Snowpipe Streaming', 'Via Ingest SDK. Inserts rows DIRECTLY without staging files. Lower latency.'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Streams">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>Track INSERT/UPDATE/DELETE on source table</p>
+            <p>Offset advances after <strong>successful DML consumption</strong> (returns 0 rows after)</p>
+            <p><code className="bg-slate-100 px-1 rounded">SYSTEM$STREAM_HAS_DATA()</code> — returns TRUE/FALSE (used in task WHEN clauses)</p>
+            <p>Stale if unconsumed past table retention — must DROP and RECREATE (cannot ALTER)</p>
+            <p><code className="bg-slate-100 px-1 rounded">CHANGE_TRACKING = TRUE</code> enables CHANGES clause without a stream</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Tasks">
+          <CompareTable
+            headers={['Concept', 'Detail']}
+            rows={[
+              ['Root task', 'Has SCHEDULE (CRON or interval)'],
+              ['Child tasks', 'NO schedule — triggered by predecessors in DAG'],
+              ['WHEN clause FALSE', 'Task skipped entirely (zero compute, not 0 rows)'],
+              ['OPERATE privilege', 'Required to resume/suspend/execute'],
+              ['Serverless tasks', 'No WAREHOUSE — uses USER_TASK_MANAGED_INITIAL_WAREHOUSE_SIZE'],
+              ['ALLOW_OVERLAPPING_EXECUTION', 'FALSE (default) — skips if previous still running'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Dynamic Tables">
+          <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 text-xs space-y-1">
+            <p>Defined by a SELECT query + TARGET_LAG</p>
+            <p>Snowflake auto-maintains freshness</p>
+            <p><strong>Supports JOINs</strong> — unlike materialized views (single table only)</p>
+          </div>
+        </Accordion>
+
+        <Traps list={[
+          '"Snowpipe uses a user warehouse" = FALSE — serverless',
+          '"Snowpipe Streaming requires staging files" = FALSE — direct row insertion',
+          '"Stale streams can be refreshed with ALTER STREAM" = FALSE — must drop/recreate',
+          '"Child tasks in a DAG can have their own SCHEDULE" = FALSE — root task only',
+          '"WHEN FALSE = task runs but processes 0 rows" = FALSE — task is skipped, no compute',
+          '"Dynamic tables are limited to one base table like MVs" = FALSE — support JOINs',
+        ]} />
+      </div>
+    ),
+  },
+  {
+    id: '3.3',
+    label: '3.3 Connectivity',
+    items: (
+      <div className="space-y-3">
+        <Accordion title="Connectors & Drivers" defaultOpen>
+          <CompareTable
+            headers={['Connector/Driver', 'Use']}
+            rows={[
+              ['Python Connector', 'Python applications'],
+              ['Kafka Connector', 'Streaming ingestion from Kafka (key-pair auth)'],
+              ['Spark Connector', 'Spark–Snowflake data exchange'],
+              ['JDBC / ODBC', 'Standard database connectivity'],
+              ['Node.js, Go, .NET', 'Language-specific drivers'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Integration Types">
+          <CompareTable
+            headers={['Integration', 'Purpose']}
+            rows={[
+              ['Storage integration', 'IAM trust for S3/Azure/GCS access. No inline credentials.'],
+              ['API integration', 'Trusted external HTTP endpoints (for external functions, webhooks)'],
+              ['Git integration', 'Sync code files from Git repo into Snowflake stage'],
+              ['Notification integration', 'Email/webhook delivery for alerts and budgets'],
+            ]}
+          />
+        </Accordion>
+
+        <Traps list={[
+          '"Storage integration stores AWS keys" = FALSE — stores Snowflake IAM user ARN; customer grants trust',
+          '"API integration is for loading data from REST APIs" = FALSE — for external functions and notifications',
+          '"Git integration versions table data" = FALSE — syncs code files (SQL, Python)',
+        ]} />
+      </div>
+    ),
+  },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DOMAIN 4: Performance
+// ─────────────────────────────────────────────────────────────────────────────
+const D4_SECTIONS = [
+  {
+    id: '4.1',
+    label: '4.1 Query Perf',
+    items: (
+      <div className="space-y-3">
+        <Accordion title="Query Profile Indicators" defaultOpen>
+          <CompareTable
+            headers={['Indicator', 'Meaning', 'Action']}
+            rows={[
+              ['Bytes spilled to local storage', 'Moderate impact. WH memory exceeded.', 'Consider upsizing'],
+              ['Bytes spilled to remote storage', 'SEVERE. Both memory and SSD exceeded.', 'Upsize warehouse'],
+              ['Inefficient pruning', 'Too many partitions scanned', 'Review clustering key or filters'],
+              ['Exploding joins', 'Missing/non-selective join = Cartesian product', 'Fix join condition, deduplicate source'],
+              ['Queuing', 'Queries waiting for compute', 'Scale OUT (more clusters) or dedicated WH'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="ACCOUNT_USAGE Performance Views">
+          <CompareTable
+            headers={['View', 'Purpose']}
+            rows={[
+              ['QUERY_HISTORY', 'Query text, duration, warehouse, bytes scanned, user'],
+              ['WAREHOUSE_METERING_HISTORY', 'Credit consumption per warehouse over time'],
+              ['ACCESS_HISTORY', 'Column-level access tracking (lineage)'],
+            ]}
+          />
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-2 text-xs">
+            <p className="font-bold text-amber-700">Query Attribution / QUERY_TAG</p>
+            <p className="text-slate-700 mt-1">Track who ran what on which warehouse. Use <code className="bg-slate-100 px-1 rounded">QUERY_TAG</code> session parameter for custom labels. Appears in QUERY_HISTORY for filtering and cost allocation.</p>
+          </div>
+        </Accordion>
+
+        <Traps list={[
+          '"Spilling to local = critical" = FALSE — moderate; REMOTE spilling is critical',
+          '"Exploding joins = out of memory" = FALSE — means Cartesian product from bad join condition',
+          '"Queuing = scale up" = FALSE — queuing = scale OUT with multi-cluster',
+        ]} />
+      </div>
+    ),
+  },
+  {
+    id: '4.2',
+    label: '4.2 Optimization',
+    items: (
+      <div className="space-y-3">
+        <Accordion title="When to Use Which Optimization" badge="Decision Guide" badgeColor="bg-amber-100 text-amber-700" defaultOpen>
+          <CompareTable
+            headers={['Pattern', 'Best Option']}
+            rows={[
+              ['Equality lookup on high-cardinality column (WHERE id = 123)', 'Search Optimization Service (SOS)'],
+              ['Range scan on low-medium cardinality (WHERE date BETWEEN)', 'Clustering key'],
+              ['Complex aggregation on pre-filtered subset', 'Materialized view'],
+              ['Ad-hoc BI queries scanning large tables', 'Query Acceleration Service (QAS)'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Query Acceleration Service (QAS)" badge="Enterprise+" badgeColor="bg-amber-100 text-amber-700">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>Serverless. Offloads portions of eligible queries to additional compute.</p>
+            <p>Best for: ad-hoc/BI queries with large scans and selective filters</p>
+            <p><code className="bg-slate-100 px-1 rounded">ALTER WAREHOUSE SET ENABLE_QUERY_ACCELERATION = TRUE</code></p>
+            <p className="text-red-700">NOT for: data loading, DDL, stored procedures</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Search Optimization Service (SOS)" badge="Enterprise+" badgeColor="bg-amber-100 text-amber-700">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>Creates persistent "search access paths" (index-like structures)</p>
+            <p>Best for: selective equality and IN lookups on HIGH-CARDINALITY columns</p>
+            <p>Background serverless maintenance process</p>
+            <p className="text-red-700">NOT clustering — does not reorganize data</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Clustering Keys">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>Best columns: DATE, TIMESTAMP, low-to-medium cardinality in WHERE/JOIN</p>
+            <p>Put <strong>lower cardinality first</strong> in multi-column keys</p>
+            <p><code className="bg-slate-100 px-1 rounded">SYSTEM$CLUSTERING_INFORMATION(table, '(col)')</code>: average_depth near 1 = well-clustered</p>
+            <p>Automatic Clustering: serverless — NOT tracked by resource monitors</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Materialized Views" badge="Enterprise+" badgeColor="bg-amber-100 text-amber-700">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>Pre-computed results. Auto-refreshed (serverless). Consumes credits for maintenance.</p>
+            <p><strong>ONE base table only</strong> — no JOINs, no subqueries on other tables</p>
+            <p>Enterprise Edition required</p>
+          </div>
+        </Accordion>
+
+        <Traps list={[
+          '"SOS clusters the table" = FALSE — creates access paths, does not reorganize',
+          '"Clustering key on high-cardinality column (unique per row)" = BAD — expensive reclustering',
+          '"MV supports JOINs" = FALSE — use Dynamic Tables for JOINs',
+          '"QAS works for data loading" = FALSE — for queries only',
+          '"Resource monitors track automatic clustering credits" = FALSE — use budgets',
+        ]} />
+      </div>
+    ),
+  },
+  {
+    id: '4.3',
+    label: '4.3 Caching',
+    items: (
+      <div className="space-y-3">
+        <Accordion title="Three Cache Layers" badge="Memorize" badgeColor="bg-amber-100 text-amber-700" defaultOpen>
+          <CompareTable
+            headers={['Cache', 'Location', 'Survives Suspend?', 'Duration', 'Contents']}
+            rows={[
+              ['Result cache', 'Cloud Services', 'YES', '24 h (each reuse resets timer)', 'Complete query output'],
+              ['Metadata cache', 'Cloud Services', 'YES', 'Always on', 'Row counts, min/max, distinct counts'],
+              ['Warehouse (SSD) cache', 'Compute nodes', 'NO — wiped', 'While running', 'Raw data from remote storage'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Result Cache Rules">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>Requires: identical query text AND unchanged underlying data</p>
+            <p>Does NOT require: same warehouse, same user, or warehouse to be running</p>
+            <p>Role-specific when row access or masking policies exist</p>
+            <p>Any DML on underlying tables invalidates the cache</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Metadata Cache Shortcuts">
+          <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 text-xs space-y-1">
+            <p><code className="bg-slate-100 px-1 rounded">COUNT(*)</code> on a large table with no WHERE → answered from metadata <strong>instantly (no warehouse)</strong></p>
+            <p>MIN/MAX on clustering key columns → may be answered from metadata</p>
+          </div>
+        </Accordion>
+
+        <Traps list={[
+          '"Result cache requires the same warehouse" = FALSE',
+          '"Result cache persists indefinitely" = FALSE — 24 hours',
+          '"SSD cache survives suspend" = FALSE — completely wiped',
+          '"Two users, same query, different roles, table has masking policy → share cache" = FALSE — role-specific',
+          '"COUNT(*) requires a warehouse" = FALSE — can be answered from metadata cache',
+        ]} />
+      </div>
+    ),
+  },
+  {
+    id: '4.4',
+    label: '4.4 Transforms',
+    items: (
+      <div className="space-y-3">
+        <Accordion title="Semi-structured Data (VARIANT)" defaultOpen>
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>Stored in VARIANT columns (JSON, Avro, Parquet, XML)</p>
+            <p>Access: <code className="bg-slate-100 px-1 rounded">data:key</code> (colon for first level), <code className="bg-slate-100 px-1 rounded">data:key.nested</code></p>
+            <p>Both <code className="bg-slate-100 px-1 rounded">data:L1:L2</code> and <code className="bg-slate-100 px-1 rounded">data:L1.L2</code> work. <code className="bg-slate-100 px-1 rounded">data.L1.L2</code> (all dots) FAILS.</p>
+            <p>Arrays: 0-indexed. Third element = <code className="bg-slate-100 px-1 rounded">[2]</code></p>
+            <p>Extraction returns VARIANT type. Cast with <code className="bg-slate-100 px-1 rounded">::VARCHAR</code>, <code className="bg-slate-100 px-1 rounded">::INTEGER</code> for native types.</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Key Functions">
+          <CompareTable
+            headers={['Function', 'Purpose']}
+            rows={[
+              ['PARSE_JSON(string)', 'String → VARIANT'],
+              ['TO_JSON(variant)', 'VARIANT → String'],
+              ['FLATTEN(input => v)', 'Explode array/object into rows. NULL/empty excluded unless OUTER => TRUE.'],
+              ['OBJECT_CONSTRUCT(k,v,...)', 'Build JSON from key-value pairs (single row)'],
+              ['OBJECT_AGG(key_col, val_col)', 'Aggregate rows into JSON object'],
+              ['ARRAY_AGG(col)', 'Aggregate rows into array'],
+              ['LISTAGG(col, delim)', 'Concatenate values from rows into delimited string'],
+              ['HASH_AGG(*)', 'Single hash of entire result set (for table comparison)'],
+              ['QUALIFY', 'Filter on window function results without a subquery'],
+              ['RESULT_SCAN(LAST_QUERY_ID())', 'Reuse previous query output'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Conditional Functions">
+          <CompareTable
+            headers={['Function', 'What it Does']}
+            rows={[
+              ['IFF(cond, true_val, false_val)', 'Inline IF-THEN-ELSE'],
+              ['NVL(expr, replacement)', 'If NULL, return replacement'],
+              ['NVL2(expr, not_null_val, null_val)', 'If NOT NULL return 2nd arg; if NULL return 3rd'],
+              ['COALESCE(a, b, c, ...)', 'First non-NULL argument'],
+              ['ZEROIFNULL(expr)', 'NULL → 0'],
+              ['NULLIFZERO(expr)', '0 → NULL'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Stored Procedures vs UDFs">
+          <CompareTable
+            headers={['Feature', 'Stored Procedures', 'UDFs / UDTFs']}
+            rows={[
+              ['Execute DDL/DML', 'YES', 'NO'],
+              ['EXECUTE AS OWNER', 'Default — owner\'s privileges', 'N/A'],
+              ['EXECUTE AS CALLER', 'Caller\'s privileges', 'N/A'],
+              ['Return type', 'Single value', 'Scalar or tabular'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Window Functions & QUALIFY">
+          <CodeSnip>{`-- QUALIFY filters window function results without a subquery\nSELECT * FROM t\nQUALIFY ROW_NUMBER() OVER (PARTITION BY grp ORDER BY val) = 1\n\n-- Running total\nSELECT SUM(amount) OVER (ORDER BY dt ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)\n\n-- Deduplicate before MERGE to avoid "duplicate row" error\nMERGE INTO target USING (SELECT DISTINCT ... FROM source) src ON ...`}</CodeSnip>
+        </Accordion>
+
+        <Traps list={[
+          '"QUALIFY is the same as HAVING" = FALSE — QUALIFY = window functions, HAVING = aggregates',
+          '"NVL2 returns the second arg when NULL" = FALSE — returns THIRD arg when NULL',
+          '"MERGE with duplicate source rows matching one target" = ERROR — must deduplicate first',
+          '"GROUP_CONCAT exists in Snowflake" = FALSE — use LISTAGG',
+          '"RUNNING_TOTAL() function exists" = FALSE — use SUM with window frame',
+          '"UDFs can execute INSERT statements" = FALSE — only stored procedures',
+          '"External functions run on the Snowflake warehouse" = FALSE — run on external service',
+        ]} />
+      </div>
+    ),
+  },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DOMAIN 5: Data Collaboration
+// ─────────────────────────────────────────────────────────────────────────────
+const D5_SECTIONS = [
+  {
+    id: '5.1',
+    label: '5.1 Collaboration',
+    items: (
+      <div className="space-y-3">
+        <Accordion title="Zero-Copy Cloning" defaultOpen>
+          <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs space-y-1">
+            <p>Zero-copy: no additional storage until data diverges</p>
+            <p>Clones inherit source retention at clone time</p>
+            <p>Captures transactional snapshot — concurrent DML does NOT affect it</p>
+          </div>
+          <CompareTable
+            headers={['Object', 'Cloneable?', 'Notes']}
+            rows={[
+              ['Databases', 'YES', 'Full hierarchy'],
+              ['Schemas', 'YES', 'All objects within'],
+              ['Permanent tables', 'YES', ''],
+              ['Transient tables', 'YES', 'Must say CREATE TRANSIENT TABLE ... CLONE'],
+              ['External stages', 'YES', 'Metadata/URL pointer only'],
+              ['Internal stages', 'NO', '"Unsupported feature" error'],
+              ['External tables', 'NO', 'Excluded from DB clones too'],
+              ['Dynamic tables', 'NO', ''],
+              ['Pipes, shares, warehouses', 'NO', ''],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Time Travel">
+          <CompareTable
+            headers={['Edition / Type', 'Max Retention']}
+            rows={[
+              ['Standard Edition — permanent tables', '1 day (0–1 day)'],
+              ['Enterprise+ — permanent tables', '90 days (0–90 days)'],
+              ['Transient / Temporary — ALL editions', '1 day (0–1 day)'],
+            ]}
+          />
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mt-2 text-xs space-y-1">
+            <p>Works for DML (INSERT, UPDATE, DELETE, MERGE) AND DROP</p>
+            <p>AT(OFFSET =&gt; -300) = 300 SECONDS ago (not rows, not minutes)</p>
+            <p>MAX_DATA_EXTENSION_TIME_IN_DAYS (default 14): extends retention to keep streams from going stale</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Fail-safe">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs space-y-1">
+            <p>7 days for permanent tables. 0 days for transient/temporary.</p>
+            <p><strong>ONLY Snowflake Support</strong> can attempt recovery — NOT user-accessible</p>
+            <p>UNDROP is Time Travel (user-accessible). Fail-safe is Support-only.</p>
+            <p>Total protection = Time Travel + Fail-safe (e.g., 10 + 7 = 17 days)</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Data Replication & Failover">
+          <CompareTable
+            headers={['Feature', 'Key Fact']}
+            rows={[
+              ['Replication group', 'Replicate objects to target accounts. Secondary is READ-ONLY.'],
+              ['Failover group', 'Extends replication with read-write failover to secondary'],
+              ['Scope', 'Works cross-region AND cross-cloud'],
+              ['Objects replicable', 'Databases, shares, roles, users, warehouses, resource monitors, network policies'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="UNDROP">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>Works within Time Travel retention period</p>
+            <p>UNDROP TABLE, UNDROP SCHEMA, UNDROP DATABASE</p>
+            <p className="text-red-700">Does NOT work for: stages, pipes, warehouses, views</p>
+          </div>
+        </Accordion>
+
+        <Traps list={[
+          '"CREATE TABLE ... CLONE transient_table" = FAILS — must say CREATE TRANSIENT TABLE ... CLONE',
+          '"External tables are included in database clones" = FALSE — excluded entirely',
+          '"Clone consumes storage immediately" = FALSE — zero-copy until divergence',
+          '"Time Travel only works for dropped tables" = FALSE — works for DML too',
+          '"Standard Edition supports 90-day Time Travel" = FALSE — 1 day max',
+          '"Fail-safe is user-accessible via UNDROP" = FALSE — Fail-safe is Support-only; UNDROP is Time Travel',
+          '"Transient tables have 1-day Fail-safe" = FALSE — 0 days always',
+          '"Replication group supports failover" = FALSE — that is failover group',
+          '"Replicated databases are writable on the secondary" = FALSE — read-only until failover',
+        ]} />
+      </div>
+    ),
+  },
+  {
+    id: '5.2',
+    label: '5.2 Sharing',
+    items: (
+      <div className="space-y-3">
+        <Accordion title="Direct Shares" defaultOpen>
+          <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs space-y-1">
+            <p>Same region ONLY</p>
+            <p>Zero-copy (no additional storage)</p>
+            <p>Consumer access is READ-ONLY — no INSERT/UPDATE/DELETE/MERGE/CLONE</p>
+            <p>Only SECURE views and SECURE UDFs can be added (standard views rejected)</p>
+          </div>
+          <CompareTable
+            headers={['Event', 'Effect on Consumer']}
+            rows={[
+              ['Provider adds table/column', 'Automatically visible (no action needed)'],
+              ['Provider drops shared table', 'Immediately inaccessible'],
+              ['Provider revokes the share', 'Consumer DB becomes empty (shell remains)'],
+              ['Consumer tries to clone', 'FAILS — no OWNERSHIP'],
+              ['Consumer tries to INSERT', 'FAILS — read-only'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Reader Accounts" badge="Big Trap" badgeColor="bg-red-100 text-red-700">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs space-y-1">
+            <p>Consumer without their own Snowflake account — provider creates and PAYS for everything</p>
+          </div>
+          <CompareTable
+            headers={['Reader CAN do', 'Reader CANNOT do']}
+            rows={[
+              ['Create warehouses', 'CREATE SHARE'],
+              ['Create databases, schemas, tables', 'CREATE PIPE'],
+              ['Run queries (SELECT, JOIN)', 'CREATE STAGE'],
+              ['Create views', 'Access Marketplace'],
+              ['Create users/roles within account', 'SHOW PROCEDURES'],
+            ]}
+          />
+        </Accordion>
+
+        <Traps list={[
+          '"Direct shares work cross-region" = FALSE — same region only; use Listings for cross-region',
+          '"Standard views can be shared" = FALSE — only SECURE views',
+          '"Consumer must refresh to see new objects in share" = FALSE — automatic',
+          '"Revoking share = consumer DB is dropped" = FALSE — DB shell remains, objects inaccessible',
+          '"Consumer can clone shared data" = FALSE — no OWNERSHIP on shared objects',
+          '"Reader Accounts cannot create warehouses" = FALSE — they can (provider pays)',
+          '"Reader Accounts cannot create any objects" = FALSE — can create DBs, tables, etc.',
+        ]} />
+      </div>
+    ),
+  },
+  {
+    id: '5.3',
+    label: '5.3 Marketplace',
+    items: (
+      <div className="space-y-3">
+        <Accordion title="Listings vs Direct Shares" defaultOpen>
+          <CompareTable
+            headers={['Feature', 'Direct Share', 'Listing']}
+            rows={[
+              ['Cross-region', 'NO', 'YES (Cross-Cloud Auto-Fulfillment)'],
+              ['Monetization', 'NO', 'YES (providers can charge)'],
+              ['Discovery', 'Must know provider account', 'Searchable in Marketplace'],
+              ['Multiple consumers', 'Must grant each individually', 'Discoverable by anyone (public) or invited (private)'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Native Apps">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>Packaged applications (code + data + Streamlit UI)</p>
+            <p>Distributed via Marketplace</p>
+            <p>Consumer installs in their own account</p>
+            <p>Runs with <strong>consumer's compute</strong> — NOT provider's</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Numbers to Memorize" badge="Cheat Sheet" badgeColor="bg-rose-100 text-rose-700">
+          <CompareTable
+            headers={['Concept', 'Value']}
+            rows={[
+              ['Fail-safe (permanent)', '7 days'],
+              ['Fail-safe (transient/temporary)', '0 days'],
+              ['Time Travel max (Standard)', '1 day'],
+              ['Time Travel max (Enterprise+, permanent)', '90 days'],
+              ['Time Travel max (transient/temporary, all editions)', '1 day'],
+              ['MAX_DATA_EXTENSION_TIME default', '14 days'],
+              ['COPY metadata retention', '64 days'],
+              ['Snowpipe metadata retention', '14 days'],
+              ['Direct Share scope', 'Same region only'],
+              ['Listing scope', 'Cross-region (Auto-Fulfillment)'],
+              ['Reader Account compute billing', 'Provider pays'],
+              ['Replicated DB access', 'Read-only (until failover)'],
+            ]}
+          />
+        </Accordion>
+
+        <Traps list={[
+          '"Direct shares support cross-region sharing" = FALSE — use Listings',
+          '"Direct shares support monetization" = FALSE — use Listings',
+          '"Listings are only public" = FALSE — private listings exist for specific accounts',
+          '"Native Apps run on the provider\'s compute" = FALSE — consumer\'s compute',
+        ]} />
+      </div>
+    ),
+  },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Study Domains Registry
+// ─────────────────────────────────────────────────────────────────────────────
+const STUDY_DOMAINS = [
+  {
+    id: 'd1',
+    icon: Layers,
+    label: 'D1 · Architecture',
+    fullLabel: 'Snowflake AI Data Cloud Features & Architecture',
+    weight: '25–30%',
+    headerColor: 'bg-blue-700',
+    pillColor: 'bg-blue-600',
+    dotColor: 'bg-blue-500',
+    sections: D1_SECTIONS,
+  },
+  {
+    id: 'd2',
+    icon: Shield,
+    label: 'D2 · Governance',
+    fullLabel: 'Account Management & Data Governance',
+    weight: '20–25%',
+    headerColor: 'bg-violet-700',
+    pillColor: 'bg-violet-600',
+    dotColor: 'bg-violet-500',
+    sections: D2_SECTIONS,
+  },
+  {
+    id: 'd3',
+    icon: Upload,
+    label: 'D3 · Data Loading',
+    fullLabel: 'Data Loading, Unloading & Connectivity',
+    weight: '10–15%',
+    headerColor: 'bg-teal-700',
+    pillColor: 'bg-teal-600',
+    dotColor: 'bg-teal-500',
+    sections: D3_SECTIONS,
+  },
+  {
+    id: 'd4',
+    icon: Zap,
+    label: 'D4 · Performance',
+    fullLabel: 'Performance Optimization, Querying & Transformation',
+    weight: '10–15%',
+    headerColor: 'bg-amber-600',
+    pillColor: 'bg-amber-600',
+    dotColor: 'bg-amber-500',
+    sections: D4_SECTIONS,
+  },
+  {
+    id: 'd5',
+    icon: Share2,
+    label: 'D5 · Collaboration',
+    fullLabel: 'Data Collaboration',
+    weight: '10–15%',
+    headerColor: 'bg-rose-700',
+    pillColor: 'bg-rose-600',
+    dotColor: 'bg-rose-500',
+    sections: D5_SECTIONS,
+  },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Root Component
+// ─────────────────────────────────────────────────────────────────────────────
+const DomainStudyHub = () => {
+  const [domainIdx,  setDomainIdx]  = useState(0);
+  const [sectionIdx, setSectionIdx] = useState(0);
+
+  const domain  = STUDY_DOMAINS[domainIdx];
+  const section = domain.sections[sectionIdx];
+  const Icon    = domain.icon;
+
+  const handleDomainChange = (i) => {
+    setDomainIdx(i);
+    setSectionIdx(0);
+  };
+
+  return (
+    <div className="space-y-4 max-w-3xl mx-auto">
+
+      {/* Header */}
+      <div className={`${domain.headerColor} rounded-2xl p-6 text-white`}>
+        <div className="flex items-center gap-3 mb-3">
+          <div className="bg-white/20 p-2 rounded-xl">
+            <Icon className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <p className="text-white/60 text-xs font-semibold uppercase tracking-wider">COF-C03 · Concept Review</p>
+            <h2 className="text-xl font-extrabold">{domain.fullLabel}</h2>
+          </div>
+          <span className="ml-auto bg-white/20 text-white text-sm font-bold px-3 py-1 rounded-full">
+            {domain.weight}
+          </span>
+        </div>
+        <p className="text-white/70 text-xs">Key concepts, reference tables, and exam traps organized by sub-domain.</p>
+      </div>
+
+      {/* Domain selector tabs */}
+      <div className="flex gap-2 flex-wrap">
+        {STUDY_DOMAINS.map((d, i) => {
+          const DIcon = d.icon;
+          return (
+            <button
+              key={d.id}
+              onClick={() => handleDomainChange(i)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border ${
+                domainIdx === i
+                  ? `${d.headerColor} text-white shadow-sm border-transparent`
+                  : 'bg-white border-slate-200 text-slate-600 hover:border-slate-400'
+              }`}
+            >
+              <DIcon className="w-3.5 h-3.5" />
+              {d.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Sub-section pills */}
+      <div className="flex gap-2 flex-wrap">
+        {domain.sections.map((s, i) => (
+          <Pill
+            key={s.id}
+            label={s.label}
+            active={sectionIdx === i}
+            onClick={() => setSectionIdx(i)}
+            color={domain.pillColor}
+          />
+        ))}
+      </div>
+
+      {/* Active content */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <div className={`w-2.5 h-2.5 rounded-full ${domain.dotColor}`} />
+          <h3 className="font-extrabold text-slate-800 text-base">{section.label}</h3>
+        </div>
+        <div className="space-y-3">
+          {section.items}
+        </div>
+      </div>
+
+      {/* Bottom nav */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => setSectionIdx(i => Math.max(0, i - 1))}
+          disabled={sectionIdx === 0}
+          className="flex items-center gap-1.5 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:border-slate-400 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+        >
+          <ChevronRight className="w-4 h-4 rotate-180" /> Prev
+        </button>
+        <span className="flex-1 text-center text-xs text-slate-400 font-medium">
+          {section.label} — {sectionIdx + 1} / {domain.sections.length}
+        </span>
+        <button
+          onClick={() => setSectionIdx(i => Math.min(domain.sections.length - 1, i + 1))}
+          disabled={sectionIdx === domain.sections.length - 1}
+          className="flex items-center gap-1.5 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:border-slate-400 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+        >
+          Next <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export default DomainStudyHub;
