@@ -14,6 +14,7 @@ import { DAY_META as D08_META, QUESTIONS as D08_Q } from './ExamDay08.js';
 import { DAY_META as D09_META, QUESTIONS as D09_Q } from './ExamDay09.js';
 import { DAY_META as D10_META, QUESTIONS as D10_Q } from './ExamDay10.js';
 import { DAY_META as D11_META, QUESTIONS as D11_Q } from './ExamDay11.js';
+import { DAY_META as HS01_META, QUESTIONS as HS01_Q } from './ExamHardSet01.js';
 
 export const ALL_DAYS = [
   { meta: D01_META, questions: D01_Q },
@@ -27,6 +28,7 @@ export const ALL_DAYS = [
   { meta: D09_META, questions: D09_Q },
   { meta: D10_META, questions: D10_Q },
   { meta: D11_META, questions: D11_Q },
+  { meta: HS01_META, questions: HS01_Q },
 ];
 
 export const ALL_QUESTIONS = ALL_DAYS.flatMap(d => d.questions);

@@ -227,7 +227,7 @@ const ExamEngine = ({ dayIndex, onBack }) => {
         <h3 className="font-bold text-slate-700">Instructions</h3>
         {[
           'The exam clock starts when you click "Start Exam" and cannot be paused.',
-          'All 60 questions must be answered before submitting — flag uncertain answers for review.',
+          `All ${meta.totalQuestions} questions must be answered before submitting — flag uncertain answers for review.`,
           'After submitting (or when time runs out), you\'ll see your full score breakdown by domain.',
           'Each question has exactly one correct answer.',
           'Passing the real exam requires approximately 80% (scaled scoring).',

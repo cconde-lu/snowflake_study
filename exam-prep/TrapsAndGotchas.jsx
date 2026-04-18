@@ -565,6 +565,169 @@ const TRAP_SECTIONS = [
       </div>
     ),
   },
+  {
+    id: 'obscure',
+    label: '🔬 Obscure & Advanced',
+    color: 'bg-indigo-600',
+    subtitle: 'Super-advanced · low-frequency · high-impact',
+    items: (
+      <div className="space-y-3">
+        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-xs text-indigo-900">
+          <p className="font-bold mb-1">⚡ Why this section exists</p>
+          <p className="leading-relaxed">
+            These are the deep-cut traps that appear on maybe 1 exam in 3 — but when they
+            show up, well-prepared candidates still miss them because they contradict a
+            "common sense" assumption. Memorize each one as a single-sentence rule.
+          </p>
+        </div>
+
+        <TrapItem
+          title="Cloud Services Billing — 10% Free Threshold"
+          trap="Cloud Services (metadata, auth, result cache) is always free or always billed."
+          truth="Cloud Services is free up to 10% of that day's warehouse credit consumption; only the portion ABOVE 10% is billed."
+          examAngle='"Customer sees unexpected CS charges — why?" Their warehouse credits dropped (e.g. heavy SUSPEND), so CS usage crossed 10%.'
+        >
+          <CodeSnip>{`-- Check CS vs warehouse credits
+SELECT
+  DATE_TRUNC('day', start_time) AS day,
+  SUM(credits_used_compute)         AS wh_credits,
+  SUM(credits_used_cloud_services)  AS cs_credits,
+  SUM(credits_used_cloud_services)
+    / NULLIF(SUM(credits_used_compute), 0) AS cs_ratio
+FROM snowflake.account_usage.warehouse_metering_history
+GROUP BY 1 ORDER BY 1 DESC;`}</CodeSnip>
+        </TrapItem>
+
+        <TrapItem
+          title="MAX_DATA_EXTENSION_TIME_IN_DAYS — The Stream Lifeline"
+          trap="A stream stays active as long as the base table still has Time Travel."
+          truth="A stream becomes STALE after DATA_RETENTION_TIME_IN_DAYS + MAX_DATA_EXTENSION_TIME_IN_DAYS with no consumption. Default MAX_DATA_EXTENSION is 14 days."
+          examAngle='"Retention = 1 day, extension = 14 days, no reader for 16 days — stream state?" STALE. Must DROP and recreate.'
+        />
+
+        <TrapItem
+          title="STATEMENT_TIMEOUT_IN_SECONDS — Lowest Wins"
+          trap="Warehouse-level timeout always wins."
+          truth="When multiple levels are set (account, warehouse, user, session), the LOWEST non-zero value applies to the query."
+          examAngle='"Account=3600, warehouse=1800, session=600. A query runs 1000s — what happens?" Cancelled at 600s (session wins).'
+        />
+
+        <TrapItem
+          title="EXECUTE AS OWNER + Masking Policy — Whose Role Counts?"
+          trap="The caller's role drives masking inside a procedure."
+          truth="Inside EXECUTE AS OWNER, CURRENT_ROLE() returns the OWNER role — so the masking policy evaluates against the owner, not the caller. This can expose data or mask it unexpectedly."
+          examAngle='"Procedure owner = DATA_ENG, caller = ANALYST, policy allows ANALYST — caller sees?" MASKED (policy sees DATA_ENG).'
+        >
+          <CodeSnip>{`-- Policy evaluates CURRENT_ROLE() at read time.
+-- In EXECUTE AS OWNER, CURRENT_ROLE() = owner, not caller.
+-- Fix: use IS_ROLE_IN_SESSION(...) or EXECUTE AS CALLER.
+CREATE MASKING POLICY ssn_mask AS (val STRING) RETURNS STRING ->
+  CASE
+    WHEN IS_ROLE_IN_SESSION('HR') THEN val
+    ELSE '***-**-****'
+  END;`}</CodeSnip>
+        </TrapItem>
+
+        <TrapItem
+          title="IMPORTED PRIVILEGES on SNOWFLAKE Database"
+          trap="ACCOUNT_USAGE views are automatically visible to custom roles."
+          truth="Non-ACCOUNTADMIN roles need GRANT IMPORTED PRIVILEGES ON DATABASE SNOWFLAKE TO ROLE <role> before they can query SNOWFLAKE.ACCOUNT_USAGE views. Database roles (OBJECT_VIEWER, USAGE_VIEWER, GOVERNANCE_VIEWER, SECURITY_VIEWER) are the scoped alternative."
+          examAngle='"Custom role gets Object does not exist on SNOWFLAKE.ACCOUNT_USAGE.QUERY_HISTORY — fix?" Grant IMPORTED PRIVILEGES on SNOWFLAKE DB.'
+        />
+
+        <TrapItem
+          title="COMMIT Inside a Procedure in an Outer Transaction"
+          trap="A stored procedure can always run its own BEGIN / COMMIT."
+          truth="If the CALLER has already opened a transaction, the procedure cannot issue its own COMMIT. It will raise an error, or its statements are scoped to the outer transaction."
+          examAngle='"Procedure with COMMIT fails when called from a script that opened BEGIN — why?" Nested COMMIT is disallowed in outer-txn context.'
+        />
+
+        <TrapItem
+          title="UNDROP After DROP + CREATE with Same Name"
+          trap="UNDROP always restores the most recent dropped object with that name."
+          truth="UNDROP restores to the ORIGINAL object name. If a NEW object of the same name was created after the DROP, UNDROP fails until you drop or rename the new one."
+          examAngle='"DROP TABLE t1; CREATE TABLE t1 (...); UNDROP TABLE t1; — result?" Error: object already exists. Not a silent overwrite.'
+        />
+
+        <TrapItem
+          title="Transient Clone — Fail-safe is Gone Forever"
+          trap="Cloning a permanent table creates a permanent clone by default."
+          truth="CREATE TRANSIENT TABLE copy CLONE perm_tbl; creates a TRANSIENT clone with 0 days Fail-safe — and you cannot convert it back to a permanent table later. Any Fail-safe protection for that data is lost."
+          examAngle='"Why is Fail-safe storage cost 0 for this clone?" It was created as TRANSIENT — Fail-safe is always 0 days for transient.'
+        />
+
+        <TrapItem
+          title="Resource Monitors Do NOT Track Serverless Credits"
+          trap="An account-level resource monitor caps ALL Snowflake credits."
+          truth="Resource monitors only track USER-managed warehouse credits. Auto-clustering, Snowpipe, Materialized Views, Search Optimization, Replication, and Serverless Tasks are NOT gated by resource monitors. Use BUDGETS for serverless features."
+          examAngle='"Account monitor set to 100 credits/day, but 300 credits of auto-clustering ran — bug?" No. Serverless is outside monitors. Use BUDGETS.'
+        />
+
+        <TrapItem
+          title="Snowpark-Optimized Warehouse — Min Size is Medium"
+          trap="You can create a Snowpark-optimized X-Small for cheap ML testing."
+          truth="Snowpark-optimized warehouses require MINIMUM size Medium, cost roughly 1.5× a standard warehouse of the same size, and provide ~16× the memory per node — they do NOT provide 16× the compute."
+          examAngle='"Smallest Snowpark-optimized warehouse available?" Medium. X-Small and Small are not permitted.'
+        />
+
+        <TrapItem
+          title="Dynamic Tables — What Can (and Can't) Be a Source"
+          trap="A Dynamic Table can be built on top of anything you can query."
+          truth="Valid sources: base tables, views, streams, and OTHER Dynamic Tables. NOT valid: external tables, shared tables, tables with row access policies that prevent full scans, materialized views."
+          examAngle='"Create DT on top of external S3 table — allowed?" No. External tables are not a supported DT source.'
+        />
+
+        <TrapItem
+          title="Cortex Analyst — Needs a Semantic Model (YAML)"
+          trap="Cortex Analyst works out-of-the-box against any schema."
+          truth="Cortex Analyst requires a SEMANTIC MODEL file (YAML) that defines verified dimensions, measures, synonyms, and sample queries. Without it, NL-to-SQL accuracy drops sharply. This is how you 'teach' Cortex your business terms."
+          examAngle='"Which Cortex feature requires a YAML semantic model?" Cortex Analyst.'
+        />
+
+        <TrapItem
+          title="Query Acceleration Service (QAS) — Edition + Scale Factor"
+          trap="QAS automatically accelerates any slow query on any edition."
+          truth="QAS requires Enterprise edition or higher, is explicitly ENABLED per warehouse (QUERY_ACCELERATION_MAX_SCALE_FACTOR), and only helps queries dominated by LARGE SCANS with filter/aggregation on OUTLIERS. Does NOT help joins, small scans, or result-cache hits."
+          examAngle='"Why did QAS not accelerate my JOIN-heavy query?" QAS targets scan-heavy outlier queries only — joins are out of scope.'
+        />
+
+        <TrapItem
+          title="Bulk COPY vs Snowpipe — ON_ERROR Defaults Differ"
+          trap="ON_ERROR default is the same regardless of load path."
+          truth="Bulk COPY default is ABORT_STATEMENT (fail fast); Snowpipe default is SKIP_FILE (keep ingesting). Same file format, same COPY options — different defaults based on context."
+          examAngle='"A COPY statement with one bad row failed; identical file via Snowpipe succeeded — why?" Different default ON_ERROR.'
+        />
+
+        <TrapItem
+          title="Reader Account — Not Read-Only"
+          trap='"Reader" means the account can only read shared data.'
+          truth="Reader Accounts CAN create warehouses, databases, tables, views, and UDFs — and the provider pays for all compute. They CANNOT create shares, pipes, stages, or run certain metadata SHOW commands."
+          examAngle='"Can a Reader Account join shared data with local staging tables it created?" YES.'
+        />
+
+        <TrapItem
+          title="Apache Iceberg — External Catalog Writes Blocked"
+          trap="All Iceberg tables behave the same in Snowflake."
+          truth="Iceberg tables with a SNOWFLAKE-managed catalog are read/write. Iceberg tables with an EXTERNAL catalog (Glue, Nessie) are READ-ONLY from Snowflake — writes must go through the engine that owns the catalog."
+          examAngle='"Insert into external-catalog Iceberg table from Snowflake — result?" Error: read-only in this mode.'
+        />
+
+        <TrapItem
+          title="Secure Shares — What Is (and Isn't) Shareable"
+          trap="You can add any view or UDF to a share."
+          truth="Only SECURE views and SECURE UDFs can be added to a share. Standard (non-secure) views are REJECTED with an error. External tables, stages, tasks, streams, and pipes cannot be shared."
+          examAngle='"Add view v1 to share — error about secure — fix?" CREATE OR REPLACE SECURE VIEW v1 AS ...'
+        />
+
+        <TrapItem
+          title="Masking / Row-Access Policies — ACCOUNTADMIN Is NOT Exempt"
+          trap="ACCOUNTADMIN can see everything, including masked values."
+          truth="NO role bypasses a masking or row access policy. If the policy does not explicitly allow ACCOUNTADMIN, it sees masked values and/or zero rows — just like every other role."
+          examAngle='"ACCOUNTADMIN queries masked SSN column — sees?" Masked ***-**-****.'
+        />
+      </div>
+    ),
+  },
 ];
 
 const PATTERN_SECTIONS = [
@@ -1035,13 +1198,13 @@ const TrapsAndGotchas = () => {
           </div>
           <div>
             <h2 className="text-xl font-extrabold">Traps & Gotchas</h2>
-            <p className="text-slate-400 text-xs">10 trap categories · 6 pattern sections · COF-C03 exam traps</p>
+            <p className="text-slate-400 text-xs">11 trap categories · 6 pattern sections · COF-C03 exam traps</p>
           </div>
         </div>
         <div className="grid grid-cols-3 gap-3 mt-4 text-center">
           {[
-            { label: '10', sub: 'trap categories' },
-            { label: '5', sub: 'top miss patterns' },
+            { label: '11', sub: 'trap categories' },
+            { label: '6', sub: 'top miss patterns' },
             { label: '55%', sub: 'avg miss rate' },
           ].map(s => (
             <div key={s.label} className="bg-white/10 rounded-xl p-3">
@@ -1060,7 +1223,7 @@ const TrapsAndGotchas = () => {
               ? 'bg-red-500 text-white shadow-sm'
               : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-400'
           }`}>
-          <AlertTriangle className="w-4 h-4" /> ⚠️ Traps (10)
+          <AlertTriangle className="w-4 h-4" /> ⚠️ Traps (11)
         </button>
         <button onClick={() => { setTab('patterns'); setActiveIndex(0); }}
           className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
