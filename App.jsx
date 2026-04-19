@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   Layers, Shield, Upload, Zap, Share2,
   ChevronRight, Star, BookOpen, CheckCircle, ClipboardList,
-  CreditCard, GraduationCap, AlertTriangle, Library,
+  CreditCard, GraduationCap, AlertTriangle, Library, Brain,
 } from 'lucide-react';
 
 import Domain1 from './domains/Domain1_Architecture.jsx';
@@ -16,6 +16,7 @@ import QuickQuiz    from './exam-prep/QuickQuiz.jsx';
 import StudySession    from './exam-prep/StudySession.jsx';
 import TrapsAndGotchas from './exam-prep/TrapsAndGotchas.jsx';
 import DomainStudyHub  from './exam-prep/DomainStudyHub.jsx';
+import CrossStudy      from './exam-prep/CrossStudy.jsx';
 
 // ─── Domain registry ──────────────────────────────────────────────────────────
 const DOMAINS = [
@@ -192,6 +193,7 @@ const App = () => {
   const [showStudySession,  setShowStudySession]  = useState(false);
   const [showTraps,         setShowTraps]         = useState(false);
   const [showDomainStudy,   setShowDomainStudy]   = useState(false);
+  const [showCrossStudy,    setShowCrossStudy]    = useState(false);
 
   // ── Quick Study sub-views ──────────────────────────────────────────────────
   const quickStudyView = showFlashCards ? 'flashcards'
@@ -199,6 +201,7 @@ const App = () => {
     : showStudySession ? 'studysession'
     : showTraps        ? 'traps'
     : showDomainStudy  ? 'domainstudy'
+    : showCrossStudy   ? 'crossstudy'
     : null;
 
   if (quickStudyView) {
@@ -206,9 +209,10 @@ const App = () => {
     const isStudy   = quickStudyView === 'studysession';
     const isTraps   = quickStudyView === 'traps';
     const isDomain  = quickStudyView === 'domainstudy';
-    const headerBg  = isFlash ? 'bg-cyan-700' : isStudy ? 'bg-emerald-700' : isTraps ? 'bg-slate-900' : isDomain ? 'bg-indigo-700' : 'bg-slate-700';
-    const iconBg    = isFlash ? 'bg-cyan-500'  : isStudy ? 'bg-emerald-500'  : isTraps ? 'bg-red-500'   : isDomain ? 'bg-indigo-400' : 'bg-slate-500';
-    const title     = isFlash ? 'Flashcards'   : isStudy ? 'Study Session'   : isTraps ? 'Traps & Gotchas' : isDomain ? 'Domain Concept Review' : 'Quick Quiz';
+    const isCross   = quickStudyView === 'crossstudy';
+    const headerBg  = isFlash ? 'bg-cyan-700'    : isStudy ? 'bg-emerald-700' : isTraps ? 'bg-slate-900'  : isDomain ? 'bg-indigo-700'  : isCross ? 'bg-orange-600' : 'bg-slate-700';
+    const iconBg    = isFlash ? 'bg-cyan-500'    : isStudy ? 'bg-emerald-500'  : isTraps ? 'bg-red-500'    : isDomain ? 'bg-indigo-400'  : isCross ? 'bg-orange-400' : 'bg-slate-500';
+    const title     = isFlash ? 'Flashcards'     : isStudy ? 'Study Session'   : isTraps ? 'Traps & Gotchas' : isDomain ? 'Domain Concept Review' : isCross ? 'Daily Cross-Reference' : 'Quick Quiz';
 
     return (
       <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-12">
@@ -220,6 +224,7 @@ const App = () => {
                 : isStudy ? <GraduationCap className="w-5 h-5 text-white" />
                 : isTraps ? <AlertTriangle className="w-5 h-5 text-white" />
                 : isDomain ? <Library className="w-5 h-5 text-white" />
+                : isCross  ? <Brain className="w-5 h-5 text-white" />
                 : <Zap className="w-5 h-5 text-white" />}
               </div>
               <div>
@@ -228,7 +233,7 @@ const App = () => {
               </div>
             </div>
             <button
-              onClick={() => { setShowFlashCards(false); setShowQuickQuiz(false); setShowStudySession(false); setShowTraps(false); setShowDomainStudy(false); }}
+              onClick={() => { setShowFlashCards(false); setShowQuickQuiz(false); setShowStudySession(false); setShowTraps(false); setShowDomainStudy(false); setShowCrossStudy(false); }}
               className="bg-white/20 hover:bg-white/30 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
             >
               ← Home
@@ -236,7 +241,7 @@ const App = () => {
           </div>
         </header>
         <main className="max-w-3xl mx-auto mt-6 px-4">
-          {isFlash ? <FlashCards /> : isStudy ? <StudySession /> : isTraps ? <TrapsAndGotchas /> : isDomain ? <DomainStudyHub /> : <QuickQuiz />}
+          {isFlash ? <FlashCards /> : isStudy ? <StudySession /> : isTraps ? <TrapsAndGotchas /> : isDomain ? <DomainStudyHub /> : isCross ? <CrossStudy /> : <QuickQuiz />}
         </main>
       </div>
     );
@@ -482,7 +487,45 @@ const App = () => {
           </div>
         </div>
 
-        {/* Exam Prep card */}
+        {/* Daily Cross-Reference card */}
+        <div
+          className="bg-orange-600 rounded-2xl shadow-md hover:shadow-lg transition-all cursor-pointer group overflow-hidden mb-4"
+          onClick={() => setShowCrossStudy(true)}
+        >
+          <div className="p-5 sm:flex items-start gap-5">
+            <div className="bg-white/20 p-3 rounded-2xl flex-shrink-0 mb-3 sm:mb-0 w-fit">
+              <Brain className="w-6 h-6 text-white" />
+            </div>
+            <div className="flex-1">
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <h3 className="text-white text-base font-extrabold">Daily Cross-Reference</h3>
+                <span className="bg-white/20 text-orange-100 text-xs font-bold px-2.5 py-1 rounded-full">Refreshes Daily</span>
+              </div>
+              <p className="text-orange-100 text-xs mb-3">
+                Three cross-domain drills — rotating Q&amp;As, a numbers quiz, and an optimization scenario challenge. New daily set every day.
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-white/15 rounded-xl p-3">
+                  <p className="text-white text-xs font-extrabold mb-0.5">⚡ Quick Recall</p>
+                  <p className="text-orange-100 text-[10px] leading-snug">55 one-liner Q&amp;As. Daily focus of 15. Reveal &amp; mark.</p>
+                </div>
+                <div className="bg-white/15 rounded-xl p-3">
+                  <p className="text-white text-xs font-extrabold mb-0.5">🔢 Numbers</p>
+                  <p className="text-orange-100 text-[10px] leading-snug">Credits · Retention · Edition gates. Tables + daily quiz.</p>
+                </div>
+                <div className="bg-white/15 rounded-xl p-3">
+                  <p className="text-white text-xs font-extrabold mb-0.5">🌳 Optimizer</p>
+                  <p className="text-orange-100 text-[10px] leading-snug">10 scenarios + interactive decision tree navigator.</p>
+                </div>
+              </div>
+            </div>
+            <div className="hidden sm:flex items-center gap-2 text-orange-100 font-bold text-sm group-hover:gap-3 transition-all flex-shrink-0 pt-1">
+              Open <ChevronRight className="w-5 h-5" />
+            </div>
+          </div>
+        </div>
+
+        {/* Exam Prep card — last item */}
         <div
           className="bg-slate-800 rounded-2xl shadow-md hover:shadow-lg transition-all cursor-pointer group overflow-hidden"
           onClick={() => setShowExamPrep(true)}
