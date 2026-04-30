@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   Layers, Shield, Upload, Zap, Share2,
   ChevronRight, Star, BookOpen, CheckCircle, ClipboardList,
-  CreditCard, GraduationCap, AlertTriangle, Library, Brain,
+  CreditCard, GraduationCap, AlertTriangle, Library, Brain, FileText,
 } from 'lucide-react';
 
 import Domain1 from './domains/Domain1_Architecture.jsx';
@@ -16,7 +16,8 @@ import QuickQuiz    from './exam-prep/QuickQuiz.jsx';
 import StudySession    from './exam-prep/StudySession.jsx';
 import TrapsAndGotchas from './exam-prep/TrapsAndGotchas.jsx';
 import DomainStudyHub  from './exam-prep/DomainStudyHub.jsx';
-import CrossStudy      from './exam-prep/CrossStudy.jsx';
+import CrossStudy           from './exam-prep/CrossStudy.jsx';
+import CertificationExams  from './exam-prep/CertificationExams.jsx';
 
 // ─── Domain registry ──────────────────────────────────────────────────────────
 const DOMAINS = [
@@ -194,6 +195,7 @@ const App = () => {
   const [showTraps,         setShowTraps]         = useState(false);
   const [showDomainStudy,   setShowDomainStudy]   = useState(false);
   const [showCrossStudy,    setShowCrossStudy]    = useState(false);
+  const [showCertExams,     setShowCertExams]     = useState(false);
 
   // ── Quick Study sub-views ──────────────────────────────────────────────────
   const quickStudyView = showFlashCards ? 'flashcards'
@@ -272,6 +274,36 @@ const App = () => {
         </header>
         <main className="max-w-5xl mx-auto mt-6 px-4">
           <ExamPrep />
+        </main>
+      </div>
+    );
+  }
+
+  // ── Certification Exams view ────────────────────────────────────────────────
+  if (showCertExams) {
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-12">
+        <header className="bg-purple-800 text-white p-4 sm:p-6 shadow-md">
+          <div className="max-w-5xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-purple-500 p-2 rounded-xl">
+                <FileText className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <p className="text-white/60 text-xs font-semibold uppercase tracking-wider">COF-C03 · Season 1</p>
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Certification Exams</h1>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowCertExams(false)}
+              className="bg-white/20 hover:bg-white/30 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors flex items-center gap-2"
+            >
+              ← Home
+            </button>
+          </div>
+        </header>
+        <main className="max-w-5xl mx-auto mt-6 px-4">
+          <CertificationExams />
         </main>
       </div>
     );
@@ -550,6 +582,37 @@ const App = () => {
               </div>
             </div>
             <div className="hidden sm:flex items-center gap-2 text-cyan-400 font-bold text-sm group-hover:gap-3 transition-all flex-shrink-0">
+              Open <ChevronRight className="w-5 h-5" />
+            </div>
+          </div>
+        </div>
+
+        {/* ── Certification Exams section ── */}
+        <h2 className="text-lg font-bold text-slate-700 mt-8 mb-4">Certification Exams</h2>
+
+        <div
+          className="bg-purple-800 rounded-2xl shadow-md hover:shadow-lg transition-all cursor-pointer group overflow-hidden"
+          onClick={() => setShowCertExams(true)}
+        >
+          <div className="p-6 sm:flex items-center gap-6">
+            <div className="bg-purple-500 p-4 rounded-2xl flex-shrink-0 mb-4 sm:mb-0 w-fit">
+              <FileText className="w-8 h-8 text-white" />
+            </div>
+            <div className="flex-1">
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <h3 className="text-white text-xl font-extrabold">Certification Exams</h3>
+                <span className="bg-purple-400/30 text-purple-200 text-xs font-bold px-2.5 py-1 rounded-full">Season 1 · 6 Exams</span>
+              </div>
+              <p className="text-purple-100 text-sm mb-3">
+                Five full 40-question mock exams with a 40-minute countdown timer. Each exam covers all 5 COF-C03 domains with increasing question diversity across sessions.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                {['E01 Baseline', 'E02–E06 Fresh angles', '40 min timer', 'Flag & review', 'Full explanations'].map(b => (
+                  <span key={b} className="bg-white/10 text-purple-200 text-[10px] font-semibold px-2.5 py-1 rounded-full">{b}</span>
+                ))}
+              </div>
+            </div>
+            <div className="hidden sm:flex items-center gap-2 text-purple-300 font-bold text-sm group-hover:gap-3 transition-all flex-shrink-0">
               Open <ChevronRight className="w-5 h-5" />
             </div>
           </div>
