@@ -166,12 +166,31 @@ const D1_SECTIONS = [
               ['Pipe', 'Defines a COPY INTO for Snowpipe. Serverless compute.'],
               ['Share', 'Contains references to objects. Consumer gets READ-ONLY access.'],
               ['File Format', 'Named set of parse options (TYPE, DELIMITER, etc.). Reusable.'],
+              ['Hybrid Table', 'Row-oriented storage (Unistore). Enforces PK/UNIQUE/FK + supports indexes. Only table type with enforced constraints.'],
+              ['Iceberg Table', 'Customer-managed storage (S3/Azure/GCS). Snowflake-managed catalog = full read/write. External catalog (e.g., Glue) = read-only + limited features.'],
             ]}
           />
         </Accordion>
+
+        <Accordion title="Account Identifier Formats" badge="Exam Fave" badgeColor="bg-blue-100 text-blue-700">
+          <CompareTable
+            headers={['Format', 'Example', 'Notes']}
+            rows={[
+              ['org-account (preferred)', 'myorg-myaccount', 'Used in connection strings and replication'],
+              ['Legacy locator', 'xy12345.us-east-1', 'Region-qualified, older format'],
+            ]}
+          />
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-2 text-xs">
+            <p className="font-bold text-amber-700">Snowflake supports 3 cloud platforms: AWS, Azure, GCP</p>
+            <p className="text-slate-700 mt-1">Data is NOT automatically replicated across regions or clouds — requires explicit replication groups or Listings.</p>
+          </div>
+        </Accordion>
+
         <Traps list={[
           '"Sequences guarantee sequential order" = FALSE — unique only, gaps possible',
           '"Shares contain data copies" = FALSE — they contain references',
+          '"Standard Snowflake tables enforce PRIMARY KEY constraints" = FALSE — informational only (Hybrid Tables do enforce)',
+          '"Iceberg tables with external catalog support full DML" = FALSE — read-mostly with limited features',
         ]} />
       </div>
     ),
@@ -222,12 +241,22 @@ const D1_SECTIONS = [
           />
         </Accordion>
 
+        <Accordion title="Resize & Timeout Behavior">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p><strong>Resizing mid-query:</strong> Only affects FUTURE queries. Queries already running continue at the OLD size.</p>
+            <p><strong>STATEMENT_TIMEOUT_IN_SECONDS:</strong> Default = <strong>172800 seconds (2 days)</strong> at warehouse level. Can be overridden at session or account level.</p>
+            <p><strong>STATEMENT_QUEUED_TIMEOUT_IN_SECONDS:</strong> Default = <strong>0</strong> (no queue timeout — queries wait indefinitely).</p>
+          </div>
+        </Accordion>
+
         <Traps list={[
           '"ECONOMY scaling reduces queuing" = FALSE — it INCREASES queuing',
           '"Scale UP helps with concurrency" = FALSE — scale OUT helps concurrency',
           '"Warehouse runs 45 seconds, billed 45 seconds" = FALSE — 60-second minimum',
           '"AUTO_SUSPEND = 0 means suspend immediately" = FALSE — means NEVER suspend',
           'ALLOW_OVERLAPPING_EXECUTION = FALSE (default): skips next run if current still running',
+          '"Resizing a warehouse speeds up a running query" = FALSE — only applies to future queries',
+          '"STATEMENT_TIMEOUT_IN_SECONDS default is 1 hour" = FALSE — default is 172800 s (2 days)',
         ]} />
       </div>
     ),
@@ -276,6 +305,21 @@ const D1_SECTIONS = [
           />
         </Accordion>
 
+        <Accordion title="Materialized View — Full Restriction List" badge="Memorize" badgeColor="bg-red-100 text-red-700">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs space-y-1">
+            <p className="font-bold text-red-700 mb-1">MVs CANNOT include any of the following:</p>
+            <p>✗ JOINs (any kind — single table only)</p>
+            <p>✗ UNIONs / UNION ALL</p>
+            <p>✗ HAVING clause</p>
+            <p>✗ ORDER BY clause</p>
+            <p>✗ LIMIT / FETCH FIRST n ROWS</p>
+            <p>✗ Window functions (ROW_NUMBER, RANK, LAG, etc.)</p>
+            <p>✗ Nested subqueries referencing other tables</p>
+            <p>✗ Non-deterministic functions (CURRENT_TIMESTAMP, RANDOM, etc.)</p>
+            <p className="font-bold text-green-700 mt-2">✓ Alternative for complex queries: Dynamic Tables (support JOINs, chaining, TARGET_LAG)</p>
+          </div>
+        </Accordion>
+
         <Traps list={[
           '"Materialized views support JOINs" = FALSE — single table only (use Dynamic Tables for JOINs)',
           '"External tables support INSERT" = FALSE — read-only, SELECT only',
@@ -317,10 +361,22 @@ const D1_SECTIONS = [
           />
         </Accordion>
 
+        <Accordion title="Snowpark Container Services (SPCS)">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>Run containerized workloads (LLMs, custom APIs, data apps) directly in Snowflake</p>
+            <p>Billed by <strong>compute pool</strong> — NOT by virtual warehouse credits</p>
+            <p>Compute pools are persistent (not auto-suspended like warehouses by default)</p>
+            <p>Enables GPU workloads for ML inference</p>
+            <p className="text-red-700">NOT the same as Snowpark (DataFrame API) or Snowflake Notebooks</p>
+          </div>
+        </Accordion>
+
         <Traps list={[
           '"Snowpark DataFrames execute on the client" = FALSE — runs on the warehouse',
           '"SiS apps run on a dedicated Streamlit server" = FALSE — Snowflake-managed compute',
           '"FORECAST is an external ML function" = FALSE — built-in ML function (no external infra)',
+          '"SPCS is billed by warehouse credits" = FALSE — billed by compute pool',
+          '"Snowpark Container Services = Snowpark Python API" = FALSE — SPCS runs containers, Snowpark runs DataFrames on a warehouse',
         ]} />
       </div>
     ),
@@ -356,6 +412,14 @@ const D2_SECTIONS = [
               ['ORGADMIN', 'Accounts (org level)', 'Org usage, replication', 'Account-level admin within accounts'],
             ]}
           />
+        </Accordion>
+
+        <Accordion title="PUBLIC Role" badge="Exam Trap" badgeColor="bg-red-100 text-red-700">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-2">
+            <p><strong>PUBLIC</strong> is automatically granted to <strong>every user AND every role</strong> in the account — it cannot be revoked</p>
+            <p>Granting a privilege to PUBLIC = giving it to <strong>everyone</strong></p>
+            <p>Custom roles: best practice is to grant them up to <strong>SYSADMIN</strong> so SYSADMIN inherits all custom object ownership visibility</p>
+          </div>
         </Accordion>
 
         <Accordion title="Secondary Roles">
@@ -398,6 +462,8 @@ const D2_SECTIONS = [
           '"Kafka connector uses OAuth" = FALSE — key-pair authentication',
           '"RSA_PRIVATE_KEY is set on the Snowflake user" = FALSE — RSA_PUBLIC_KEY is set, private stays local',
           '"SCIM provisions databases" = FALSE — provisions users and maps groups to roles',
+          '"PUBLIC role can be revoked from a user" = FALSE — automatically granted to everyone, cannot be revoked',
+          '"Granting to SYSADMIN is optional for custom roles" = FALSE — best practice requires it so SYSADMIN can manage all objects',
         ]} />
       </div>
     ),
@@ -412,7 +478,17 @@ const D2_SECTIONS = [
             <p>Conditionally mask column values based on querying role</p>
             <p><strong>NO ROLE BYPASSES</strong> masking policies — not even ACCOUNTADMIN</p>
             <p>Use <code className="bg-slate-100 px-1 rounded">IS_ROLE_IN_SESSION()</code> (not CURRENT_ROLE) to capture secondary roles</p>
-            <p>Tag-based masking: attach policy to a tag → all tagged columns inherit automatically</p>
+            <p>Only <strong>one masking policy per column</strong> at a time</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Tag-Based Masking Policies" badge="Enterprise+" badgeColor="bg-violet-100 text-violet-700">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>Attach a masking policy to a <strong>tag</strong> → every column tagged with it is automatically protected</p>
+            <p>Scales governance across thousands of columns without individual column assignments</p>
+            <p>Tags <strong>propagate downstream through views</strong> (lineage) — masking follows the data</p>
+            <p>Object tag limit: up to <strong>50 unique tag keys per object</strong></p>
+            <p className="text-red-700">Tags alone do NOT enforce anything — enforcement requires an attached policy</p>
           </div>
         </Accordion>
 
@@ -484,19 +560,21 @@ const D2_SECTIONS = [
           </div>
         </Accordion>
 
-        <Accordion title="ACCOUNT_USAGE vs INFORMATION_SCHEMA">
+        <Accordion title="ACCOUNT_USAGE vs INFORMATION_SCHEMA vs ORGANIZATION_USAGE">
           <CompareTable
-            headers={['Property', 'ACCOUNT_USAGE', 'INFORMATION_SCHEMA']}
+            headers={['Property', 'ACCOUNT_USAGE', 'INFORMATION_SCHEMA', 'ORGANIZATION_USAGE']}
             rows={[
-              ['Latency', '45 min – 3 hours', 'Near real-time'],
-              ['Retention', '365 days', '7–14 days'],
-              ['Scope', 'Entire account', 'Current database only'],
-              ['Location', 'SNOWFLAKE database', 'Each database'],
+              ['Latency', '45 min – 3 hours', 'Near real-time', '2+ hours'],
+              ['Retention', '365 days', '7–14 days', '365 days'],
+              ['Scope', 'Entire account', 'Current database only', 'All accounts in org'],
+              ['Role required', 'IMPORTED PRIVILEGES on SNOWFLAKE DB', 'Any with DB access', 'ORGADMIN'],
             ]}
           />
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-2 text-xs">
             <p className="font-bold text-amber-700">Key ACCOUNT_USAGE views</p>
             <p className="text-slate-700 mt-1">QUERY_HISTORY, ACCESS_HISTORY, LOGIN_HISTORY, WAREHOUSE_METERING_HISTORY, TABLE_STORAGE_METRICS, GRANTS_TO_ROLES, GRANTS_TO_USERS</p>
+            <p className="font-bold text-amber-700 mt-2">ORGANIZATION_USAGE use case</p>
+            <p className="text-slate-700 mt-1">Cross-account billing analysis and credit consumption across the entire organization — requires ORGADMIN.</p>
           </div>
         </Accordion>
 
@@ -520,7 +598,24 @@ const D3_SECTIONS = [
     label: '3.1 Loading',
     items: (
       <div className="space-y-3">
-        <Accordion title="File Formats Supported" defaultOpen>
+        <Accordion title="Optimal File Size & Compression" badge="Memorize" badgeColor="bg-amber-100 text-amber-700" defaultOpen>
+          <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 text-xs space-y-1">
+            <p className="font-bold text-teal-700">Recommended file size: <strong>100–250 MB compressed</strong></p>
+            <p>Applies to both COPY INTO (bulk) and Snowpipe — balances parallelism vs per-file overhead</p>
+            <p className="text-red-700 font-semibold">Too small: high per-file overhead, slow. Too large: limits parallelism.</p>
+          </div>
+          <CompareTable
+            headers={['Compression', 'Notes']}
+            rows={[
+              ['GZIP', 'Default for PUT command'],
+              ['BZIP2 / BROTLI / ZSTD / DEFLATE / RAW_DEFLATE', 'Supported for CSV/JSON'],
+              ['Snappy', 'Typical native compression inside Parquet/ORC/Avro files'],
+              ['AUTO_DETECT', 'COPY INTO detects compression automatically'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="File Formats Supported">
           <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 text-xs">
             <p className="font-bold text-teal-700 mb-1">Supported: CSV, JSON, Avro, ORC, Parquet, XML</p>
             <p className="text-red-700 font-semibold">NOT supported: Excel (.xlsx), PDF, binary — must convert first</p>
@@ -622,8 +717,10 @@ const D3_SECTIONS = [
             headers={['Feature', 'Key Facts']}
             rows={[
               ['Snowpipe', 'Serverless compute (no user warehouse). AUTO_INGEST=TRUE (cloud events) or REST API trigger.'],
-              ['Default ON_ERROR', 'SKIP_FILE — not ABORT_STATEMENT'],
-              ['Snowpipe Streaming', 'Via Ingest SDK. Inserts rows DIRECTLY without staging files. Lower latency.'],
+              ['Snowpipe default ON_ERROR', 'SKIP_FILE — not ABORT_STATEMENT (opposite of bulk COPY)'],
+              ['Snowpipe REST API endpoints', 'insertFiles (trigger load), insertReport (load status), loadHistoryScan (query history)'],
+              ['Snowpipe Streaming', 'Via Ingest SDK. Inserts rows DIRECTLY without staging files. Sub-minute latency.'],
+              ['Snowpipe vs Bulk COPY', 'Snowpipe = continuous micro-batches, serverless billing per-file. Bulk = scheduled, your warehouse.'],
             ]}
           />
         </Accordion>
@@ -644,12 +741,18 @@ const D3_SECTIONS = [
             rows={[
               ['Root task', 'Has SCHEDULE (CRON or interval)'],
               ['Child tasks', 'NO schedule — triggered by predecessors in DAG'],
+              ['Minimum schedule (warehouse)', '1 minute'],
+              ['Minimum schedule (serverless)', '~10 seconds (newer feature)'],
               ['WHEN clause FALSE', 'Task skipped entirely (zero compute, not 0 rows)'],
               ['OPERATE privilege', 'Required to resume/suspend/execute'],
               ['Serverless tasks', 'No WAREHOUSE — uses USER_TASK_MANAGED_INITIAL_WAREHOUSE_SIZE'],
               ['ALLOW_OVERLAPPING_EXECUTION', 'FALSE (default) — skips if previous still running'],
             ]}
           />
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-2 text-xs">
+            <p className="font-bold text-amber-700">CRON syntax includes timezone</p>
+            <p className="text-slate-700 mt-1"><code className="bg-slate-100 px-1 rounded">USING CRON 0 9 * * MON America/New_York</code> — timezone is mandatory for CRON-based tasks</p>
+          </div>
         </Accordion>
 
         <Accordion title="Dynamic Tables">
@@ -797,6 +900,8 @@ const D4_SECTIONS = [
             <p>Put <strong>lower cardinality first</strong> in multi-column keys</p>
             <p><code className="bg-slate-100 px-1 rounded">SYSTEM$CLUSTERING_INFORMATION(table, '(col)')</code>: average_depth near 1 = well-clustered</p>
             <p>Automatic Clustering: serverless — NOT tracked by resource monitors</p>
+            <p className="font-bold text-amber-700 mt-2">Recommended threshold: tables larger than ~1 TB</p>
+            <p>Smaller tables don't benefit — natural load order is sufficient, and re-clustering wastes serverless credits</p>
           </div>
         </Accordion>
 
@@ -827,19 +932,31 @@ const D4_SECTIONS = [
           <CompareTable
             headers={['Cache', 'Location', 'Survives Suspend?', 'Duration', 'Contents']}
             rows={[
-              ['Result cache', 'Cloud Services', 'YES', '24 h (each reuse resets timer)', 'Complete query output'],
+              ['Result cache', 'Cloud Services', 'YES', '24 h per reuse; max 31 days if continuously reused', 'Complete query output'],
               ['Metadata cache', 'Cloud Services', 'YES', 'Always on', 'Row counts, min/max, distinct counts'],
               ['Warehouse (SSD) cache', 'Compute nodes', 'NO — wiped', 'While running', 'Raw data from remote storage'],
             ]}
           />
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-2 text-xs">
+            <p className="font-bold text-amber-700">Result cache is account-level (Cloud Services)</p>
+            <p className="text-slate-700 mt-1">Any warehouse — or no warehouse — can hit a cached result. The result does NOT belong to the warehouse that created it.</p>
+          </div>
         </Accordion>
 
-        <Accordion title="Result Cache Rules">
+        <Accordion title="Result Cache Rules & Invalidation Triggers" badge="Exam Fave" badgeColor="bg-blue-100 text-blue-700">
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
-            <p>Requires: identical query text AND unchanged underlying data</p>
-            <p>Does NOT require: same warehouse, same user, or warehouse to be running</p>
-            <p>Role-specific when row access or masking policies exist</p>
-            <p>Any DML on underlying tables invalidates the cache</p>
+            <p className="font-bold text-slate-700">Cache HIT requires ALL of:</p>
+            <p>✓ Identical query text (character-for-character)</p>
+            <p>✓ Underlying micro-partitions unchanged since last run</p>
+            <p>✓ Same role context (if masking/row-access policies exist)</p>
+          </div>
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 mt-2 text-xs space-y-1">
+            <p className="font-bold text-red-700">Cache is INVALIDATED by any of:</p>
+            <p>✗ Any DML on the underlying tables (INSERT, UPDATE, DELETE, MERGE)</p>
+            <p>✗ Non-deterministic functions: CURRENT_TIMESTAMP(), CURRENT_DATE(), RANDOM(), UUID_STRING()</p>
+            <p>✗ UDFs not marked as deterministic</p>
+            <p>✗ Changes in data masking or row access policies</p>
+            <p>✗ Query text changed (even whitespace or alias)</p>
           </div>
         </Accordion>
 
@@ -851,11 +968,12 @@ const D4_SECTIONS = [
         </Accordion>
 
         <Traps list={[
-          '"Result cache requires the same warehouse" = FALSE',
-          '"Result cache persists indefinitely" = FALSE — 24 hours',
+          '"Result cache requires the same warehouse" = FALSE — account-level, any warehouse hits it',
+          '"Result cache persists indefinitely" = FALSE — 24 h per reuse, hard max 31 days',
           '"SSD cache survives suspend" = FALSE — completely wiped',
           '"Two users, same query, different roles, table has masking policy → share cache" = FALSE — role-specific',
           '"COUNT(*) requires a warehouse" = FALSE — can be answered from metadata cache',
+          '"CURRENT_DATE() in a query hits the result cache" = FALSE — non-deterministic, always re-executes',
         ]} />
       </div>
     ),
@@ -923,6 +1041,15 @@ const D4_SECTIONS = [
           <CodeSnip>{`-- QUALIFY filters window function results without a subquery\nSELECT * FROM t\nQUALIFY ROW_NUMBER() OVER (PARTITION BY grp ORDER BY val) = 1\n\n-- Running total\nSELECT SUM(amount) OVER (ORDER BY dt ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)\n\n-- Deduplicate before MERGE to avoid "duplicate row" error\nMERGE INTO target USING (SELECT DISTINCT ... FROM source) src ON ...`}</CodeSnip>
         </Accordion>
 
+        <Accordion title="MERGE Non-Determinism">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p><code className="bg-slate-100 px-1 rounded">ERROR_ON_NONDETERMINISTIC_MERGE</code> — defaults to <strong>TRUE</strong></p>
+            <p>If multiple source rows match a single target row → <strong>error</strong> (prevents undefined winner)</p>
+            <p>Set to FALSE to allow non-deterministic behavior (last-write-wins, undefined)</p>
+            <p className="text-green-700 font-semibold">Best practice: deduplicate source with QUALIFY ROW_NUMBER()=1 before MERGE</p>
+          </div>
+        </Accordion>
+
         <Traps list={[
           '"QUALIFY is the same as HAVING" = FALSE — QUALIFY = window functions, HAVING = aggregates',
           '"NVL2 returns the second arg when NULL" = FALSE — returns THIRD arg when NULL',
@@ -931,6 +1058,7 @@ const D4_SECTIONS = [
           '"RUNNING_TOTAL() function exists" = FALSE — use SUM with window frame',
           '"UDFs can execute INSERT statements" = FALSE — only stored procedures',
           '"External functions run on the Snowflake warehouse" = FALSE — run on external service',
+          '"ERROR_ON_NONDETERMINISTIC_MERGE defaults to FALSE" = FALSE — it defaults to TRUE (errors on ambiguous match)',
         ]} />
       </div>
     ),
@@ -963,9 +1091,22 @@ const D5_SECTIONS = [
               ['Internal stages', 'NO', '"Unsupported feature" error'],
               ['External tables', 'NO', 'Excluded from DB clones too'],
               ['Dynamic tables', 'NO', ''],
-              ['Pipes, shares, warehouses', 'NO', ''],
+              ['Pipes', 'Partially', 'Cloned SUSPENDED — load history is NOT cloned'],
+              ['Tasks', 'YES', 'Cloned in SUSPENDED state — must manually resume'],
+              ['Streams', 'YES', 'Clone inherits source offset at clone time'],
+              ['Shares, warehouses', 'NO', ''],
             ]}
           />
+        </Accordion>
+
+        <Accordion title="DATA_RETENTION_TIME_IN_DAYS = 0" badge="Exam Trap" badgeColor="bg-red-100 text-red-700">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs space-y-1">
+            <p>Setting retention to <strong>0 disables Time Travel entirely</strong> for that object</p>
+            <p>Dropped/updated data is <strong>immediately unrecoverable</strong> via Time Travel</p>
+            <p>Permanent tables still have <strong>Fail-safe (7 days)</strong> — but that is Support-only</p>
+            <p>Transient tables with 0 retention = <strong>zero protection</strong> (no TT, no Fail-safe)</p>
+            <p className="text-red-700 font-semibold">UNDROP will FAIL if data retention = 0</p>
+          </div>
         </Accordion>
 
         <Accordion title="Time Travel">
@@ -1032,11 +1173,31 @@ const D5_SECTIONS = [
     label: '5.2 Sharing',
     items: (
       <div className="space-y-3">
-        <Accordion title="Direct Shares" defaultOpen>
+        <Accordion title="What CAN and CANNOT Be Shared" badge="Memorize" badgeColor="bg-amber-100 text-amber-700" defaultOpen>
+          <CompareTable
+            headers={['CAN Share', 'CANNOT Share']}
+            rows={[
+              ['Tables (permanent, external, Iceberg)', 'Standard (non-secure) views'],
+              ['Secure views', 'Standard UDFs'],
+              ['Secure UDFs', 'Stored procedures'],
+              ['Secure materialized views', 'Stages (any type)'],
+              ['Dynamic tables', 'Sequences'],
+              ['', 'File formats, Pipes, Tasks, Streams, Warehouses'],
+            ]}
+          />
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-2 text-xs">
+            <p className="font-bold text-amber-700">ACCOUNTADMIN required to create and manage shares</p>
+            <p className="text-slate-700 mt-1">Only ACCOUNTADMIN (or a role with CREATE SHARE privilege) can create a share object.</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Direct Shares">
           <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs space-y-1">
             <p>Same region ONLY</p>
             <p>Zero-copy (no additional storage)</p>
             <p>Consumer access is READ-ONLY — no INSERT/UPDATE/DELETE/MERGE/CLONE</p>
+            <p>Consumer <strong>CANNOT run Time Travel queries</strong> on shared objects</p>
+            <p>Consumer <strong>CANNOT clone</strong> shared objects (no OWNERSHIP on them)</p>
             <p>Only SECURE views and SECURE UDFs can be added (standard views rejected)</p>
           </div>
           <CompareTable
@@ -1054,6 +1215,7 @@ const D5_SECTIONS = [
         <Accordion title="Reader Accounts" badge="Big Trap" badgeColor="bg-red-100 text-red-700">
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs space-y-1">
             <p>Consumer without their own Snowflake account — provider creates and PAYS for everything</p>
+            <p>Maximum <strong>20 reader accounts</strong> per provider account (default limit)</p>
           </div>
           <CompareTable
             headers={['Reader CAN do', 'Reader CANNOT do']}
@@ -1073,8 +1235,11 @@ const D5_SECTIONS = [
           '"Consumer must refresh to see new objects in share" = FALSE — automatic',
           '"Revoking share = consumer DB is dropped" = FALSE — DB shell remains, objects inaccessible',
           '"Consumer can clone shared data" = FALSE — no OWNERSHIP on shared objects',
+          '"Consumer can query historical data via Time Travel on shared table" = FALSE — TT not available on shared objects',
           '"Reader Accounts cannot create warehouses" = FALSE — they can (provider pays)',
           '"Reader Accounts cannot create any objects" = FALSE — can create DBs, tables, etc.',
+          '"Any role can create a share" = FALSE — requires ACCOUNTADMIN or CREATE SHARE privilege',
+          '"Reader Account limit is 100 per account" = FALSE — default limit is 20',
         ]} />
       </div>
     ),
@@ -1114,13 +1279,23 @@ const D5_SECTIONS = [
               ['Time Travel max (Standard)', '1 day'],
               ['Time Travel max (Enterprise+, permanent)', '90 days'],
               ['Time Travel max (transient/temporary, all editions)', '1 day'],
+              ['DATA_RETENTION = 0', 'Disables Time Travel; UNDROP fails'],
               ['MAX_DATA_EXTENSION_TIME default', '14 days'],
               ['COPY metadata retention', '64 days'],
               ['Snowpipe metadata retention', '14 days'],
+              ['Optimal load file size', '100–250 MB compressed'],
+              ['Multi-cluster WH max clusters', '10'],
+              ['Multi-cluster ECONOMY wait time', '6 minutes before adding cluster'],
+              ['Result cache TTL (per reuse)', '24 hours; max 31 days if continuously reused'],
+              ['STATEMENT_TIMEOUT_IN_SECONDS default', '172800 s (2 days)'],
+              ['Reader Account limit per provider', '20 accounts'],
+              ['Clustering recommended for tables', '> ~1 TB'],
               ['Direct Share scope', 'Same region only'],
               ['Listing scope', 'Cross-region (Auto-Fulfillment)'],
               ['Reader Account compute billing', 'Provider pays'],
               ['Replicated DB access', 'Read-only (until failover)'],
+              ['Task minimum schedule (warehouse)', '1 minute'],
+              ['Consumer Time Travel on shared data', 'NOT available'],
             ]}
           />
         </Accordion>
