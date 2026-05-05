@@ -118,6 +118,43 @@ const D1_SECTIONS = [
             '"All editions encrypt data at rest" = TRUE — AES-256 on all editions',
           ]} />
         </Accordion>
+
+        <Accordion title="Architecture Layer — Cannot-Do Matrix" badge="5-Point Audit" badgeColor="bg-purple-100 text-purple-700">
+          <CompareTable
+            headers={['Layer', 'CANNOT Do', 'Common Confusion']}
+            rows={[
+              ['Cloud Services', 'Cannot run user queries; cannot store data; cannot persist beyond account', 'Mistaken for "where the result cache lives" — TRUE; mistaken for "where queries execute" — FALSE'],
+              ['Compute (Virtual WH)', 'Cannot store query results long-term; cannot persist SSD cache across suspend; cannot share state across warehouses', 'Mistaken for "where pruning happens" — pruning is in Cloud Services optimizer'],
+              ['Storage', 'Cannot be queried directly; cannot be modified in place (micro-partitions are immutable); cannot have user-defined partition sizes', 'Mistaken for "where compute happens" — storage is purely persistent layer'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Account-Level Limits & Defaults" badge="Memorize" badgeColor="bg-amber-100 text-amber-700">
+          <CompareTable
+            headers={['Limit', 'Value', 'Notes']}
+            rows={[
+              ['Max columns per table', '5000+ (very high)', 'Practical cap, not a hard exam number'],
+              ['Max databases per account', 'No documented hard limit', 'Soft limit, large in practice'],
+              ['Max query text length', '1,000,000 characters', 'Hard limit on a single SQL statement'],
+              ['Max QUERY_TAG length', '2000 characters', 'Truncated beyond this'],
+              ['Default session idle timeout', '4 hours', 'CLIENT_SESSION_KEEP_ALIVE = FALSE by default'],
+              ['Default LOCK_TIMEOUT', '43,200 s (12 hours)', 'Session-level parameter'],
+              ['Default ABORT_DETACHED_QUERY', 'FALSE', 'Disconnected client → query keeps running'],
+              ['Default USE_CACHED_RESULT', 'TRUE', 'Result cache is opt-OUT, not opt-IN'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Edition — Cross-Region & Replication Notes">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>VPS (Virtual Private Snowflake) — completely isolated metadata store; <strong>cannot</strong> share via Direct Share normally (Support-mediated)</p>
+            <p>Failover Groups require <strong>Business Critical+</strong> on BOTH source and target accounts</p>
+            <p>Replication itself works at all editions, but <strong>failover</strong> is BC+</p>
+            <p>HIPAA / PCI / FedRAMP compliance start at <strong>Business Critical</strong></p>
+            <p className="text-red-700">Edition is set per ACCOUNT — not per database, schema, or warehouse</p>
+          </div>
+        </Accordion>
       </div>
     ),
   },
@@ -186,6 +223,47 @@ const D1_SECTIONS = [
           </div>
         </Accordion>
 
+        <Accordion title="Session & Connection Defaults" badge="Memorize" badgeColor="bg-amber-100 text-amber-700">
+          <CompareTable
+            headers={['Parameter', 'Default', 'Effect']}
+            rows={[
+              ['CLIENT_SESSION_KEEP_ALIVE', 'FALSE', 'Session expires after 4 h idle. Set TRUE for long-running app connections.'],
+              ['CLIENT_SESSION_KEEP_ALIVE_HEARTBEAT_FREQUENCY', '3600 s (1 hr)', 'Heartbeat interval when KEEP_ALIVE = TRUE'],
+              ['STATEMENT_TIMEOUT_IN_SECONDS', '172800 (2 days)', 'Max time a query can run before auto-cancel'],
+              ['STATEMENT_QUEUED_TIMEOUT_IN_SECONDS', '0 (no timeout)', 'Queries wait forever in queue by default'],
+              ['QUERY_TAG', '(empty)', 'Custom session label visible in QUERY_HISTORY'],
+              ['TIMEZONE', 'America/Los_Angeles', 'Account default unless overridden'],
+              ['USE_CACHED_RESULT', 'TRUE', 'Result cache enabled; set FALSE to force recompute'],
+              ['DEFAULT_DDL_COLLATION', '(empty)', 'No default collation on new objects'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="User Object Defaults — DEFAULT_ROLE / WAREHOUSE / NAMESPACE">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>A USER object can store these defaults that apply at login when no override is specified:</p>
+            <p>✓ <strong>DEFAULT_ROLE</strong> — the role activated automatically (still must be granted to the user)</p>
+            <p>✓ <strong>DEFAULT_WAREHOUSE</strong> — the warehouse used when SQL is run</p>
+            <p>✓ <strong>DEFAULT_NAMESPACE</strong> — sets a database (and optionally schema) so unqualified table names resolve</p>
+            <p>✓ <strong>DEFAULT_SECONDARY_ROLES</strong> — controls which secondary roles activate at login (typically 'ALL')</p>
+            <p className="text-red-700 mt-2">Setting DEFAULT_ROLE = X does NOT grant role X — it must be granted separately</p>
+            <p className="text-red-700">DEFAULT_WAREHOUSE = X does NOT grant USAGE on warehouse X — privilege must exist</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Snowsight vs SnowSQL — Cannot-Do Matrix" badge="5-Point Audit" badgeColor="bg-purple-100 text-purple-700">
+          <CompareTable
+            headers={['Tool', 'Cannot Do', 'Confused With']}
+            rows={[
+              ['Snowsight (web UI)', 'PUT/GET file transfer; bulk scripted automation; piping shell output to SQL', 'Often confused with Classic Console (legacy UI being retired)'],
+              ['SnowSQL (CLI)', 'Render dashboards or charts; build Streamlit apps; manage worksheets', 'Often confused with Snowflake CLI ("snow") — different tool'],
+              ['Snowflake CLI ("snow")', 'Replace SnowSQL for ad-hoc SQL by default (it has SQL but is object/Snowpark-focused)', 'Confused with SnowSQL; "snow" handles Streamlit/Notebooks/Native Apps deployment'],
+              ['SnowCD', 'Execute queries; authenticate; transfer files', 'Confused with snowsql — SnowCD only diagnoses connectivity (DNS, TLS, OCSP, proxy)'],
+              ['SQL API', 'PUT/GET; call out to third-party REST APIs during execution; username/password auth', 'Confused with REST drivers — SQL API is HTTP-only, not a driver wrapper'],
+            ]}
+          />
+        </Accordion>
+
         <Traps list={[
           '"SnowCD executes queries" = FALSE — it only tests connectivity',
           '"SQL API uses username/password" = FALSE — OAuth or JWT only',
@@ -195,6 +273,9 @@ const D1_SECTIONS = [
           '"If specified role is not granted, login uses PUBLIC" = FALSE — login fails',
           '"Sharing a worksheet shares the underlying table data" = FALSE — recipient still needs their own grants',
           '"Suspending the warehouse is the fastest way to cancel ONE query" = FALSE — kills all queries on it',
+          '"Setting DEFAULT_ROLE on a user grants that role" = FALSE — grant must be done separately',
+          '"Disconnecting the client cancels the running query" = FALSE — ABORT_DETACHED_QUERY defaults FALSE; query continues',
+          '"USE_CACHED_RESULT defaults to FALSE" = FALSE — defaults TRUE (cache is opt-out)',
         ]} />
       </div>
     ),
@@ -267,11 +348,76 @@ const D1_SECTIONS = [
           </div>
         </Accordion>
 
+        <Accordion title="Object Defaults & Limits" badge="Memorize" badgeColor="bg-amber-100 text-amber-700">
+          <CompareTable
+            headers={['Object', 'Default / Limit', 'Notes']}
+            rows={[
+              ['Sequence — START WITH', '1', 'INCREMENT defaults to 1; NOORDER is default'],
+              ['Sequence — ORDER vs NOORDER', 'NOORDER (default)', 'NOORDER = better performance, gaps possible. ORDER = sequential, more contention.'],
+              ['Database — DATA_RETENTION_TIME_IN_DAYS', '1 day', 'Inherited by schemas/tables unless overridden'],
+              ['Schema — managed access', 'OFF (default)', 'When ON, only schema owner grants privileges on contained objects'],
+              ['Table — column count', 'No documented hard cap (very high)', 'Practical limit only'],
+              ['Identifier — case sensitivity', 'Case-FOLDED to UPPER unless quoted', '"my_table" vs my_table — quoted preserves exact case'],
+              ['Identifier — max length', '255 characters', 'Applies to DB/schema/table/column names'],
+              ['Pipe — owner', 'Role that creates it', 'Pipe runs as its owner; OWNERSHIP transfer changes execution role'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Table Type — Full Cannot-Do Matrix" badge="5-Point Audit" badgeColor="bg-purple-100 text-purple-700">
+          <CompareTable
+            headers={['Table Type', 'Cannot Do', 'Edition Gate']}
+            rows={[
+              ['Permanent', 'Avoid Fail-safe charges (always 7 days)', 'All editions'],
+              ['Transient', 'Time Travel beyond 1 day; Fail-safe', 'All editions'],
+              ['Temporary', 'Outlive session; be queried by other sessions; have Fail-safe', 'All editions'],
+              ['External', 'INSERT/UPDATE/DELETE/MERGE; Time Travel; standalone clone; be in DB clones', 'All editions'],
+              ['Dynamic', 'DML directly (only via TARGET_LAG refresh); cloning', 'Enterprise+ recommended'],
+              ['Iceberg (Snowflake-managed catalog)', 'Be queried by external catalogs without limitations', 'All editions'],
+              ['Iceberg (external catalog)', 'Full DML; some features limited; read-mostly', 'All editions'],
+              ['Hybrid (Unistore)', 'Be created without indexes/PK; preview limits apply', 'Preview/Enterprise+'],
+              ['Event', 'Be modified directly; only used by EVENT_TABLE for telemetry', 'All editions'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="View Type — Full Comparison">
+          <CompareTable
+            headers={['Aspect', 'Standard View', 'Secure View', 'Materialized View', 'Dynamic Table']}
+            rows={[
+              ['Definition visible', 'YES (granted roles)', 'NO (only owner)', 'NO (Secure flag implicit)', 'YES'],
+              ['Storage cost', 'NO', 'NO', 'YES (pre-computed)', 'YES (full table)'],
+              ['Refresh', 'On-the-fly (always)', 'On-the-fly', 'Auto (serverless)', 'TARGET_LAG-driven'],
+              ['JOINs', 'YES', 'YES', 'NO (single table)', 'YES'],
+              ['Shareable', 'NO', 'YES', 'YES (Secure MV)', 'YES'],
+              ['Edition required', 'All', 'All', 'Enterprise+', 'Enterprise recommended'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Unsupported Features for External & Iceberg Tables">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs space-y-1">
+            <p className="font-bold text-red-700">External Tables CANNOT:</p>
+            <p>✗ Be the target of INSERT, UPDATE, DELETE, or MERGE</p>
+            <p>✗ Have Time Travel (no AT/BEFORE)</p>
+            <p>✗ Be cloned (standalone OR included in a database clone)</p>
+            <p>✗ Be replicated via replication groups</p>
+            <p>✗ Have constraints (PK/FK/UNIQUE)</p>
+            <p className="font-bold text-red-700 mt-2">Iceberg Tables (external catalog) CANNOT:</p>
+            <p>✗ Be the target of all DML (depends on catalog)</p>
+            <p>✗ Use some Snowflake-only features (replication, certain optimizations)</p>
+          </div>
+        </Accordion>
+
         <Traps list={[
           '"Sequences guarantee sequential order" = FALSE — unique only, gaps possible',
+          '"Sequences with ORDER guarantee gap-free" = FALSE — guarantees order in single session, not gap-free',
           '"Shares contain data copies" = FALSE — they contain references',
           '"Standard Snowflake tables enforce PRIMARY KEY constraints" = FALSE — informational only (Hybrid Tables do enforce)',
           '"Iceberg tables with external catalog support full DML" = FALSE — read-mostly with limited features',
+          '"Identifiers are case-sensitive by default" = FALSE — folded to UPPER unless quoted',
+          '"Schemas inherit DATA_RETENTION from the database automatically" = TRUE if not overridden — but it CAN be overridden at schema/table level',
+          '"External tables can be cloned as part of a database clone" = FALSE — excluded entirely',
         ]} />
       </div>
     ),
@@ -330,6 +476,61 @@ const D1_SECTIONS = [
           </div>
         </Accordion>
 
+        <Accordion title="Warehouse Parameters — Complete Defaults" badge="Memorize" badgeColor="bg-amber-100 text-amber-700">
+          <CompareTable
+            headers={['Parameter', 'Default', 'Notes']}
+            rows={[
+              ['WAREHOUSE_SIZE', 'XSMALL', 'On CREATE if not specified'],
+              ['AUTO_SUSPEND', '600 s (10 min)', '0 = NEVER suspend; NULL = NEVER suspend'],
+              ['AUTO_RESUME', 'TRUE', 'Resumes automatically on incoming query'],
+              ['INITIALLY_SUSPENDED', 'FALSE', 'Created in STARTED state by default'],
+              ['MIN_CLUSTER_COUNT', '1', 'Multi-cluster only — minimum running clusters'],
+              ['MAX_CLUSTER_COUNT', '1', '1 = single-cluster (default). >1 = multi-cluster.'],
+              ['SCALING_POLICY', 'STANDARD', 'STANDARD adds clusters faster; ECONOMY waits for 6-min queue'],
+              ['MAX clusters allowed', '10', 'Hard maximum on multi-cluster warehouses'],
+              ['WAREHOUSE_TYPE', 'STANDARD', 'STANDARD or SNOWPARK-OPTIMIZED'],
+              ['ENABLE_QUERY_ACCELERATION', 'FALSE', 'Must be enabled per warehouse for QAS'],
+              ['QUERY_ACCELERATION_MAX_SCALE_FACTOR', '8', 'Max additional compute multiplier (1–100)'],
+              ['RESOURCE_MONITOR', 'NULL', 'Optional — assign to enforce credit limits'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Multi-Cluster Warehouse — Defaults & Behaviors">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>MIN=1, MAX=1 → effectively single-cluster (no auto-scaling)</p>
+            <p>MIN=N, MAX=N (with N&gt;1) → "Maximized mode" — always runs N clusters; SCALING_POLICY ignored</p>
+            <p>MIN=1, MAX&gt;1 → "Auto-scale mode" — adds/removes clusters based on queue + policy</p>
+            <p>STANDARD policy: adds cluster on queue immediately</p>
+            <p>ECONOMY policy: waits ~6 minutes of queue before adding a cluster (saves credits)</p>
+            <p className="text-red-700 mt-2">Multi-cluster ≠ Snowpark-Optimized. Different concepts. Multi-cluster = horizontal scaling, Snowpark-Optimized = bigger memory footprint.</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Warehouse Cannot-Do Matrix" badge="5-Point Audit" badgeColor="bg-purple-100 text-purple-700">
+          <CompareTable
+            headers={['Warehouse Type', 'Cannot Do', 'Confused With']}
+            rows={[
+              ['Standard', 'Run large-memory ML/UDFs efficiently; train large models', 'Snowpark-Optimized — same scaling but 16x memory'],
+              ['Snowpark-Optimized', 'Be smaller than MEDIUM (entry size); run cheaply for tiny workloads', 'Standard with Snowpark API — that is just normal queries'],
+              ['Multi-cluster (any size)', 'Speed up ONE query; replace Scale UP for spilling', 'Scale UP — different problem (single-query memory)'],
+              ['Compute Pool (SPCS)', 'Be billed via warehouse credits', 'Warehouses — separate billing model'],
+              ['Serverless (Snowpipe/Tasks/MV/SOS)', 'Be tracked by Resource Monitors', 'Warehouse credits — serverless has separate budget tracking'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Suspend & Resume Behaviors">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p><strong>Suspend</strong> drops SSD cache immediately (warm cache lost)</p>
+            <p><strong>Resume</strong> restarts from cold cache — first query after resume reads from remote storage</p>
+            <p><strong>Manual SUSPEND</strong> while queries running: queries finish first (normally), then suspend kicks in</p>
+            <p><strong>ALTER WAREHOUSE SUSPEND</strong> with running queries: queries are <strong>aborted</strong> immediately if forced; otherwise wait</p>
+            <p>AUTO_SUSPEND timer is reset on every query — clock starts when warehouse goes idle</p>
+            <p>60-second minimum billing per resume — even a 5-second query bills 60 s</p>
+          </div>
+        </Accordion>
+
         <Traps list={[
           '"ECONOMY scaling reduces queuing" = FALSE — it INCREASES queuing',
           '"Scale UP helps with concurrency" = FALSE — scale OUT helps concurrency',
@@ -338,6 +539,11 @@ const D1_SECTIONS = [
           'ALLOW_OVERLAPPING_EXECUTION = FALSE (default): skips next run if current still running',
           '"Resizing a warehouse speeds up a running query" = FALSE — only applies to future queries',
           '"STATEMENT_TIMEOUT_IN_SECONDS default is 1 hour" = FALSE — default is 172800 s (2 days)',
+          '"AUTO_SUSPEND default is 5 minutes" = FALSE — default is 600 s (10 minutes)',
+          '"MAX_CLUSTER_COUNT default is auto-detect" = FALSE — defaults to 1 (single cluster)',
+          '"Maximized mode (MIN=MAX) respects SCALING_POLICY" = FALSE — policy is ignored when MIN=MAX',
+          '"Snowpark-Optimized warehouses come in XSMALL" = FALSE — start at MEDIUM',
+          '"ENABLE_QUERY_ACCELERATION is on by default" = FALSE — must be opted in per warehouse',
         ]} />
       </div>
     ),
@@ -401,12 +607,69 @@ const D1_SECTIONS = [
           </div>
         </Accordion>
 
+        <Accordion title="Storage Layer Defaults & Limits" badge="Memorize" badgeColor="bg-amber-100 text-amber-700">
+          <CompareTable
+            headers={['Item', 'Value', 'Notes']}
+            rows={[
+              ['Micro-partition size', '50–500 MB uncompressed', '~16 MB compressed typical; immutable, columnar'],
+              ['Micro-partition trigger', 'Auto on every load', 'Cannot be manually defined or sized'],
+              ['Compression', 'Auto (Snowflake-managed)', 'Customer pays for COMPRESSED bytes only'],
+              ['Storage cost', 'Per-TB compressed/month', 'Plus Time Travel + Fail-safe additions'],
+              ['DATA_RETENTION_TIME_IN_DAYS — default', '1 day', 'Inherited DB → Schema → Table unless overridden'],
+              ['DATA_RETENTION_TIME_IN_DAYS — min/max (Standard)', '0 / 1', 'Permanent and transient/temp same on Standard'],
+              ['DATA_RETENTION_TIME_IN_DAYS — max (Enterprise+)', '90 (permanent only)', 'Transient/temp still capped at 1'],
+              ['Fail-safe (permanent)', '7 days fixed', 'Cannot be configured — Snowflake-managed'],
+              ['Fail-safe (transient/temp)', '0 days', 'No Fail-safe ever'],
+              ['MIN_DATA_RETENTION_TIME_IN_DAYS (account)', '0 default', 'Account-level floor — overrides any object setting'],
+              ['MAX_DATA_EXTENSION_TIME_IN_DAYS', '14 days default', 'Stream-driven retention extension cap'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="View Type — Cannot-Do Matrix" badge="5-Point Audit" badgeColor="bg-purple-100 text-purple-700">
+          <CompareTable
+            headers={['View Type', 'Cannot Do', 'Confused With']}
+            rows={[
+              ['Standard view', 'Be shared (must be Secure); hide its definition', 'Materialized view — standard recomputes every time'],
+              ['Secure view', 'Take advantage of certain optimizations (definition not pushed down)', 'Standard view — same syntax + SECURE keyword'],
+              ['Materialized view', 'JOINs, UNIONs, ORDER BY, HAVING, window functions, non-deterministic functions', 'Dynamic table — DT supports JOINs, MV does not'],
+              ['Dynamic table', 'Be modified directly (read-only target); be cloned; replace MV for single-table simple cases (overkill)', 'Materialized view — DT has full SQL but is a real table with storage'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Clustering — When NOT to Use">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs space-y-1">
+            <p>✗ Tables &lt; 1 TB — natural load order suffices</p>
+            <p>✗ Highly transactional tables (frequent INSERT/UPDATE) — re-clustering cost dominates</p>
+            <p>✗ Columns with very high cardinality (e.g., unique IDs) — use Search Optimization Service (SOS) instead</p>
+            <p>✗ Low-cardinality columns alone (e.g., country with 200 values) — pruning gains are small</p>
+            <p>✗ Tables already well-clustered by load pattern (e.g., always loaded by date)</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Stages — Defaults & Cannot-Do Matrix">
+          <CompareTable
+            headers={['Stage Type', 'Default URL', 'Cannot Do']}
+            rows={[
+              ['User stage (@~)', 'Auto-created per user', 'Be shared with another user; be cloned; be dropped (lifecycle = user lifecycle)'],
+              ['Table stage (@%table)', 'Auto-created per table', 'Have file format defaults; be standalone; be cloned'],
+              ['Named internal', 'Created on Snowflake-managed storage', 'Be cloned ("Unsupported feature"); be referenced cross-account'],
+              ['Named external', 'Points to S3/Azure/GCS via URL', 'Provide row-level access controls on data within; bypass external IAM rules'],
+            ]}
+          />
+        </Accordion>
+
         <Traps list={[
           '"Materialized views support JOINs" = FALSE — single table only (use Dynamic Tables for JOINs)',
           '"External tables support INSERT" = FALSE — read-only, SELECT only',
           '"CREATE TABLE ... CLONE transient_table" = FAILS — must use CREATE TRANSIENT TABLE ... CLONE',
           '"External tables are included in database clones" = FALSE — excluded entirely',
           '"Internal stages can be cloned" = FALSE — external stages CAN',
+          '"DATA_RETENTION_TIME_IN_DAYS default is 0" = FALSE — default is 1 day',
+          '"Standard Edition transient tables can have 90-day retention" = FALSE — transient is always 0–1 day',
+          '"Fail-safe is configurable from 0 to 30 days" = FALSE — fixed at 7 days for permanent, 0 for transient/temp',
+          '"Clustering helps tables of any size" = FALSE — recommended only for tables &gt; ~1 TB',
         ]} />
       </div>
     ),
@@ -466,12 +729,51 @@ const D1_SECTIONS = [
           </div>
         </Accordion>
 
+        <Accordion title="Compute Type Confusion — Where Does Each Run?" badge="5-Point Audit" badgeColor="bg-purple-100 text-purple-700">
+          <CompareTable
+            headers={['Tech', 'Runs On', 'Billing', 'Cannot']}
+            rows={[
+              ['Snowpark DataFrames (Python/Java/Scala)', 'Standard or Snowpark-Optimized warehouse', 'Warehouse credits', 'Run on client; run without a warehouse'],
+              ['Streamlit in Snowflake (SiS)', 'Snowflake-managed serverless compute', 'Warehouse credits (viewer\'s WH)', 'Be hosted on streamlit.io; access internet without external integration'],
+              ['Snowflake Notebooks', 'Warehouse OR Snowpark Container Services', 'Warehouse credits OR compute-pool credits', 'Be embedded in arbitrary external apps'],
+              ['Snowpark Container Services (SPCS)', 'Compute Pools (Kubernetes-like)', 'Compute-pool credits (per node-hour)', 'Use warehouse credits; run on serverless tasks'],
+              ['Native Apps', 'Consumer\'s warehouse / compute', 'CONSUMER pays for compute', 'Run on provider\'s account; auto-scale provider compute'],
+              ['External Functions', 'Customer-hosted endpoint via API gateway', 'Snowflake bills cloud-services time only', 'Run inside Snowflake; access Snowflake DB directly'],
+              ['Cortex LLM functions', 'Snowflake-hosted GPU infra', 'Per-token pricing, no warehouse needed', 'Be customized with custom-trained models (use Cortex Fine-Tuning)'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Cortex Functions — Edition & Region Notes">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>Cortex LLM functions (COMPLETE, SUMMARIZE, TRANSLATE, SENTIMENT, EXTRACT_ANSWER, CLASSIFY_TEXT) — region availability varies; cross-region inference can be enabled when local region lacks the model</p>
+            <p>FORECAST and ANOMALY_DETECTION — built-in ML, generally available all editions</p>
+            <p>Cortex Search and Cortex Analyst — preview/GA varies by region</p>
+            <p>Cortex Fine-Tuning — supported only on specific models (e.g., mistral-7b, llama2-70b)</p>
+            <p className="text-red-700 mt-2">Cortex calls are billed PER-TOKEN (input + output) — not warehouse seconds</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Snowpark API — What it Cannot Do">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs space-y-1">
+            <p>✗ Run JavaScript UDFs (only Python/Java/Scala via API; JS via raw SQL only)</p>
+            <p>✗ Execute outside a Snowflake session (always remote — DataFrames are lazy)</p>
+            <p>✗ Replace SQL — UDFs/UDTFs/sprocs still work for in-DB compute</p>
+            <p>✗ Be used for streaming inserts (use Snowpipe Streaming SDK separately)</p>
+            <p>✗ Avoid warehouse costs — ALL execution requires a running warehouse</p>
+          </div>
+        </Accordion>
+
         <Traps list={[
           '"Snowpark DataFrames execute on the client" = FALSE — runs on the warehouse',
           '"SiS apps run on a dedicated Streamlit server" = FALSE — Snowflake-managed compute',
           '"FORECAST is an external ML function" = FALSE — built-in ML function (no external infra)',
           '"SPCS is billed by warehouse credits" = FALSE — billed by compute pool',
           '"Snowpark Container Services = Snowpark Python API" = FALSE — SPCS runs containers, Snowpark runs DataFrames on a warehouse',
+          '"Cortex LLM functions consume warehouse credits" = FALSE — billed per token',
+          '"Native Apps run on the provider\'s compute" = FALSE — consumer pays for compute',
+          '"External functions execute inside Snowflake" = FALSE — call out to customer-hosted endpoint',
+          '"Snowpark supports JavaScript UDFs" = FALSE — Python/Java/Scala only via API',
         ]} />
       </div>
     ),
@@ -547,6 +849,70 @@ const D2_SECTIONS = [
           </div>
         </Accordion>
 
+        <Accordion title="Authentication Defaults & Limits" badge="Memorize" badgeColor="bg-amber-100 text-amber-700">
+          <CompareTable
+            headers={['Item', 'Default / Limit', 'Notes']}
+            rows={[
+              ['Password min length', '8 characters', 'Plus complexity rules (mix of cases, digits)'],
+              ['MFA provider', 'Duo Security', 'Built-in; no extra license'],
+              ['MFA enrollment', 'User self-enrollment', 'Cannot be globally forced without authentication policy'],
+              ['SAML2 IdP types', 'Okta, Azure AD, Ping, ADFS, custom', 'Configured via SECURITY_INTEGRATION'],
+              ['Key-pair: max keys per user', '2', 'RSA_PUBLIC_KEY and RSA_PUBLIC_KEY_2 (for rotation)'],
+              ['Key-pair: key size', '2048-bit RSA min, 4096 recommended', 'PEM format'],
+              ['OAuth flow types', 'Snowflake OAuth, External OAuth', 'External = Okta/Azure/Custom IdP'],
+              ['SCIM endpoint format', 'https://&lt;account&gt;.snowflakecomputing.com/scim/v2/', 'OAuth bearer token from SCIM integration'],
+              ['Session token (default lifetime)', '4 hours idle / ~1 hour active', 'Master token longer; refreshed by drivers'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Network Policy Defaults & Limits">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p><strong>Default state:</strong> No network policy → all IPs allowed</p>
+            <p><strong>BLOCKED_IP_LIST</strong> takes precedence over ALLOWED_IP_LIST (same IP in both = blocked)</p>
+            <p><strong>User-level policy</strong> overrides account-level (not additive)</p>
+            <p>Supports CIDR ranges (e.g., 10.0.0.0/24)</p>
+            <p>Maximum entries per list: large (no exam-relevant cap)</p>
+            <p>Network policies do NOT control where queries are EXECUTED — only where connections originate</p>
+            <p className="text-red-700 mt-2">Locking yourself out: account-level policy that excludes your IP → must contact Support</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Role Type Confusion Matrix" badge="5-Point Audit" badgeColor="bg-purple-100 text-purple-700">
+          <CompareTable
+            headers={['Role Type', 'Scope', 'Cannot', 'Confused With']}
+            rows={[
+              ['Account role (custom)', 'Account-wide', 'Be granted to objects directly', 'Database role — different scope'],
+              ['Database role', 'Single database only', 'Hold privileges on objects outside the parent database', 'Account role — DB roles do NOT propagate cross-DB'],
+              ['Application role (Native App)', 'Within installed Native App', 'Be used outside the app context', 'Custom roles — not interchangeable'],
+              ['Instance role (Native App)', 'Per app instance', 'Survive app uninstall', 'Application roles — instance-specific permissions'],
+              ['System role (PUBLIC)', 'Auto-granted to all', 'Be revoked', 'Custom default role — PUBLIC is automatic'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Authentication Policies (Newer Feature)">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>Restrict allowed AUTHENTICATION_METHODS (e.g., only SAML + KEY_PAIR; block PASSWORD)</p>
+            <p>Restrict allowed CLIENT_TYPES (e.g., only DRIVERS; block SNOWFLAKE_UI)</p>
+            <p>Restrict allowed SECURITY_INTEGRATIONS (e.g., only Okta; block default password)</p>
+            <p>Force MFA for password-based logins (MFA_AUTHENTICATION_METHODS = ('PASSWORD'))</p>
+            <p>Applied at <strong>account or user level</strong> (user overrides account)</p>
+            <p className="text-red-700 mt-2">Authentication policy is the modern way to enforce MFA — older approach was per-user MFA enrollment</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Federated Auth (SSO) Behaviors">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>SAML 2.0 — browser-redirect to IdP for sign-in</p>
+            <p>SnowSQL supports SSO via <code className="bg-slate-100 px-1 rounded">--authenticator externalbrowser</code></p>
+            <p>Drivers (JDBC/ODBC/Python) support EXTERNALBROWSER, SNOWFLAKE_JWT, OAUTH</p>
+            <p>SCIM = automated user/group sync from IdP. SCIM does NOT replace SAML; they pair together</p>
+            <p>SAML logs in users; SCIM provisions users into Snowflake first</p>
+            <p className="text-red-700">Disabling password and using SSO only = "single sign-on enforced" — set via authentication policy</p>
+          </div>
+        </Accordion>
+
         <Traps list={[
           '"USERADMIN can grant SELECT on tables" = FALSE — that is SECURITYADMIN',
           '"SECURITYADMIN creates databases" = FALSE — that is SYSADMIN',
@@ -559,6 +925,11 @@ const D2_SECTIONS = [
           '"SCIM provisions databases" = FALSE — provisions users and maps groups to roles',
           '"PUBLIC role can be revoked from a user" = FALSE — automatically granted to everyone, cannot be revoked',
           '"Granting to SYSADMIN is optional for custom roles" = FALSE — best practice requires it so SYSADMIN can manage all objects',
+          '"BLOCKED_IP_LIST is additive with ALLOWED_IP_LIST" = FALSE — BLOCKED takes precedence',
+          '"User-level network policy adds to account-level" = FALSE — user-level OVERRIDES account-level',
+          '"MFA can be forced globally without an authentication policy" = FALSE — needed authentication policy or per-user enrollment',
+          '"SCIM and SAML are alternatives" = FALSE — they pair (SCIM provisions, SAML signs-in)',
+          '"Key-pair authentication supports only one public key per user" = FALSE — supports two for rotation',
         ]} />
       </div>
     ),
@@ -658,12 +1029,82 @@ const D2_SECTIONS = [
           />
         </Accordion>
 
+        <Accordion title="Policy Defaults & Limits" badge="Memorize" badgeColor="bg-amber-100 text-amber-700">
+          <CompareTable
+            headers={['Policy', 'Default / Limit', 'Notes']}
+            rows={[
+              ['Masking policies per column', '1', 'Cannot stack multiple masking policies on the same column'],
+              ['Row access policies per table', '1', 'Cannot stack; replace to change'],
+              ['Tag keys per object', '50 max', 'Hard limit'],
+              ['Tag string length', '256 characters', 'Per tag value'],
+              ['Tag allowed values', 'Optional ALLOWED_VALUES list', 'Enforced if specified; otherwise free-form'],
+              ['Aggregation policy min group size', 'Configurable (e.g., 5)', 'Smaller groups suppressed in output'],
+              ['Projection policy', 'Per column', 'Controls visibility of column in SELECT/projection'],
+              ['Edition required', 'Enterprise+', 'For all governance policies (masking, row access, tag, aggregation, projection)'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Policy Type Confusion Matrix" badge="5-Point Audit" badgeColor="bg-purple-100 text-purple-700">
+          <CompareTable
+            headers={['Policy', 'What it Filters', 'What it Cannot', 'Confused With']}
+            rows={[
+              ['Masking policy', 'Column VALUES (transforms data per role)', 'Block reads entirely; affect INSERT', 'Row access — masking changes the value, not the row'],
+              ['Row access policy', 'Which ROWS the role sees', 'Change values; affect INSERT directly', 'Masking — RAP filters rows, masking changes columns'],
+              ['Projection policy', 'Whether the COLUMN can be projected (SELECT)', 'Affect filters in WHERE; mask values', 'Column-level grants — projection policies are evaluated per query'],
+              ['Aggregation policy', 'Forces minimum group size in aggregations', 'Block individual row reads; mask values', 'Differential privacy — aggregation policies are simpler k-anonymity-style'],
+              ['Tag-based policy', 'Auto-attach a policy via tag', 'Enforce anything by itself', 'Tags alone — tags are metadata; policy must be attached'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="What Policies CANNOT Do">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs space-y-1">
+            <p>✗ ACCOUNTADMIN cannot bypass masking or row access policies (no role-bypass)</p>
+            <p>✗ Multiple masking policies on the same column (one per column max)</p>
+            <p>✗ Cover multiple data types in one masking policy (one type per policy)</p>
+            <p>✗ Be applied to external tables (most policies — tables only)</p>
+            <p>✗ Reference data outside Snowflake (no external lookups in policy bodies)</p>
+            <p>✗ Apply to sequences, stages, file formats (object types without DML)</p>
+            <p>✗ Auto-decrypt — they hide/transform values, not encrypt them</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Object Tagging — How Propagation Works">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>Tags propagate <strong>downstream through views</strong> — column lineage carries tags</p>
+            <p>Tags propagate <strong>via cloning</strong> — clone inherits source tags</p>
+            <p>Tags can be set at: account, database, schema, table, view, column, warehouse, pipe, role, user, share</p>
+            <p>Tag inheritance: object-level tag wins over inherited; explicit unset removes inheritance</p>
+            <p><code className="bg-slate-100 px-1 rounded">SNOWFLAKE.ACCOUNT_USAGE.TAG_REFERENCES</code> shows where tags are applied</p>
+            <p><code className="bg-slate-100 px-1 rounded">SYSTEM$GET_TAG('tag_name', 'object', 'TABLE')</code> returns the value</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Encryption — Hierarchy & Rotation">
+          <CompareTable
+            headers={['Layer', 'Key', 'Rotation']}
+            rows={[
+              ['Root key (Snowflake)', 'Master key per account', 'Annually (auto)'],
+              ['Account master key', 'Wraps table master keys', 'Annually'],
+              ['Table master key', 'Wraps file keys', 'Annually'],
+              ['File key', 'Wraps individual file', 'Per-file generation'],
+              ['Tri-Secret Secure (BC+)', 'Customer key + Snowflake key composite', 'Customer-controlled rotation'],
+            ]}
+          />
+        </Accordion>
+
         <Traps list={[
           '"Tags enforce masking automatically" = FALSE — must attach policy to tag',
           '"ACCOUNTADMIN bypasses masking" = FALSE',
           '"Row access policy missing ELSE — unmentioned roles see all rows" = FALSE — 0 rows',
           '"SYSTEM$CLASSIFY works on VARIANT columns" = FALSE — primitive types only',
           '"Projection policy controls INSERT" = FALSE — controls SELECT/projection visibility',
+          '"Multiple masking policies can be stacked on a column" = FALSE — one per column maximum',
+          '"One masking policy can handle multiple data types" = FALSE — one data type per policy',
+          '"Tag limit per object is unlimited" = FALSE — 50 unique tag keys max',
+          '"Tags propagate to downstream views automatically" = TRUE — column lineage carries tags',
+          '"Aggregation policy applies row-level masking" = FALSE — enforces minimum group size in aggregations',
         ]} />
       </div>
     ),
@@ -709,11 +1150,89 @@ const D2_SECTIONS = [
           </div>
         </Accordion>
 
+        <Accordion title="Resource Monitor — Defaults & Limits" badge="Memorize" badgeColor="bg-amber-100 text-amber-700">
+          <CompareTable
+            headers={['Item', 'Default / Limit', 'Notes']}
+            rows={[
+              ['CREDIT_QUOTA', 'Required (no default)', 'Must be specified at creation'],
+              ['FREQUENCY', 'MONTHLY', 'DAILY / WEEKLY / MONTHLY / YEARLY / NEVER'],
+              ['START_TIMESTAMP', 'IMMEDIATELY', 'Or explicit timestamp'],
+              ['END_TIMESTAMP', 'NULL (no end)', 'Optional cutoff'],
+              ['Trigger types', 'NOTIFY / SUSPEND / SUSPEND_IMMEDIATE', 'Multiple triggers per monitor'],
+              ['Max triggers', 'Many (no exam-relevant cap)', 'Each trigger independent'],
+              ['ALTER ... SET TRIGGERS', 'REPLACES all existing triggers', 'Not additive!'],
+              ['Privilege to view', 'MONITOR', 'Plus MODIFY to change quotas'],
+              ['Privilege to create', 'ACCOUNTADMIN only', 'Cannot delegate CREATE'],
+              ['Tracks', 'User-managed warehouse credits only', 'Serverless requires Budgets'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Trigger Action Differences">
+          <CompareTable
+            headers={['Action', 'Effect on Running Queries', 'Use Case']}
+            rows={[
+              ['NOTIFY', 'No effect — sends notification only', 'Early warning at 75%, 90%, etc.'],
+              ['SUSPEND', 'Running queries finish; no new queries', 'Soft cutoff; allow current work to complete'],
+              ['SUSPEND_IMMEDIATE', 'Aborts ALL running queries instantly', 'Hard cutoff; protect from runaway costs'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Budgets vs Resource Monitors — Cannot-Do Matrix" badge="5-Point Audit" badgeColor="bg-purple-100 text-purple-700">
+          <CompareTable
+            headers={['Feature', 'Resource Monitor', 'Budget']}
+            rows={[
+              ['Tracks user warehouse credits', 'YES', 'YES'],
+              ['Tracks serverless (Snowpipe, MV, SOS, auto-clustering)', 'NO', 'YES'],
+              ['Tracks Cortex (LLM tokens)', 'NO', 'YES'],
+              ['Suspend warehouses', 'YES', 'NO (notification only)'],
+              ['Notification only', 'YES', 'YES (only mode)'],
+              ['Per-warehouse target', 'YES', 'YES'],
+              ['Account-wide target', 'YES (one monitor)', 'YES'],
+              ['Configurable threshold %', 'YES', 'YES'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="ACCOUNT_USAGE Latency Cheat Sheet">
+          <CompareTable
+            headers={['View', 'Typical Latency', 'Retention']}
+            rows={[
+              ['QUERY_HISTORY', '45 min', '365 days'],
+              ['LOGIN_HISTORY', '~2 hours', '365 days'],
+              ['ACCESS_HISTORY', '~3 hours', '365 days'],
+              ['WAREHOUSE_METERING_HISTORY', '~3 hours', '365 days'],
+              ['STORAGE_USAGE', '~daily', '365 days'],
+              ['DATABASE_STORAGE_USAGE_HISTORY', '~daily', '365 days'],
+              ['GRANTS_TO_ROLES', '~2 hours', '365 days'],
+              ['TABLE_STORAGE_METRICS', '~daily', '365 days'],
+              ['INFORMATION_SCHEMA equivalents', 'Near real-time', '7–14 days only'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Trust Center & Compliance Reporting">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p><strong>Trust Center</strong> — built-in security posture scanner</p>
+            <p>Scanners include CIS Benchmark for Snowflake, threat intelligence, security best practices</p>
+            <p>Findings categorized by severity (CRITICAL / HIGH / MEDIUM / LOW)</p>
+            <p>Requires <strong>ACCOUNTADMIN</strong> or specific Trust Center role</p>
+            <p>Some scanners require <strong>Enterprise+</strong> edition</p>
+            <p className="text-red-700">Trust Center does NOT enforce remediation — it surfaces findings; admins must act</p>
+          </div>
+        </Accordion>
+
         <Traps list={[
           '"Resource monitors track Snowpipe credits" = FALSE — use budgets',
           '"ALTER RESOURCE MONITOR without TRIGGERS keeps old triggers" = TRUE — but WITH TRIGGERS replaces all',
           '"ACCOUNT_USAGE is real-time" = FALSE — 45 min – 3 hour latency',
           '"INFORMATION_SCHEMA retains 365 days" = FALSE — 7–14 days only',
+          '"SUSPEND trigger aborts all running queries" = FALSE — that is SUSPEND_IMMEDIATE',
+          '"SECURITYADMIN can create resource monitors" = FALSE — ACCOUNTADMIN only',
+          '"Default frequency for a resource monitor is DAILY" = FALSE — MONTHLY',
+          '"Resource monitors track Cortex token spend" = FALSE — use budgets',
+          '"Trust Center automatically remediates issues" = FALSE — surfaces findings only',
         ]} />
       </div>
     ),
@@ -828,6 +1347,98 @@ const D3_SECTIONS = [
           </div>
         </Accordion>
 
+        <Accordion title="COPY INTO — Complete Default Values" badge="Memorize" badgeColor="bg-amber-100 text-amber-700">
+          <CompareTable
+            headers={['Parameter', 'Default', 'Notes']}
+            rows={[
+              ['ON_ERROR (bulk COPY)', 'ABORT_STATEMENT', 'Stops on first error'],
+              ['ON_ERROR (Snowpipe)', 'SKIP_FILE', 'Skips bad files, continues'],
+              ['SIZE_LIMIT', 'NULL (no limit)', 'Max bytes loaded per COPY'],
+              ['FORCE', 'FALSE', 'TRUE bypasses metadata dedup → duplicates risk'],
+              ['PURGE', 'FALSE', 'TRUE deletes source files after success'],
+              ['MATCH_BY_COLUMN_NAME', 'NONE', 'Set to CASE_SENSITIVE / CASE_INSENSITIVE for name matching'],
+              ['ENFORCE_LENGTH', 'TRUE', 'Errors if string > column length'],
+              ['TRUNCATECOLUMNS', 'FALSE', 'TRUE silently truncates instead of erroring'],
+              ['LOAD_HISTORY (BULK)', '64 days', 'Files in load_history are skipped'],
+              ['LOAD_HISTORY (Snowpipe)', '14 days', 'Files in pipe load_history are skipped'],
+              ['VALIDATION_MODE', 'NULL (live load)', 'RETURN_n_ROWS or RETURN_ERRORS for dry-run'],
+              ['INCLUDE_METADATA', 'NULL', 'Add METADATA$ pseudo-cols (newer feature)'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="File Format Defaults — Per Type">
+          <CompareTable
+            headers={['Format', 'Key Default']}
+            rows={[
+              ['CSV — FIELD_DELIMITER', '","'],
+              ['CSV — RECORD_DELIMITER', '"\\n"'],
+              ['CSV — SKIP_HEADER', '0'],
+              ['CSV — PARSE_HEADER', 'FALSE'],
+              ['CSV — FIELD_OPTIONALLY_ENCLOSED_BY', 'NONE'],
+              ['CSV — TRIM_SPACE', 'FALSE'],
+              ['CSV — NULL_IF', '("\\\\N")'],
+              ['CSV — ESCAPE', 'NONE'],
+              ['CSV — ESCAPE_UNENCLOSED_FIELD', '"\\\\\\\\"'],
+              ['CSV — EMPTY_FIELD_AS_NULL', 'TRUE'],
+              ['CSV — ERROR_ON_COLUMN_COUNT_MISMATCH', 'TRUE'],
+              ['JSON — STRIP_OUTER_ARRAY', 'FALSE'],
+              ['JSON — STRIP_NULL_VALUES', 'FALSE'],
+              ['JSON — IGNORE_UTF8_ERRORS', 'FALSE'],
+              ['Compression', 'AUTO (auto-detect)'],
+              ['PUT compression', 'GZIP (auto-applied)'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="ON_ERROR Options — Full List">
+          <CompareTable
+            headers={['Value', 'Behavior', 'Use Case']}
+            rows={[
+              ['ABORT_STATEMENT', 'Stop the entire COPY on first error (default for bulk)', 'Strict, all-or-nothing batch loads'],
+              ['CONTINUE', 'Continue past errors, log them, load valid rows', 'Best-effort load with later error review'],
+              ['SKIP_FILE', 'Skip the entire file containing any error (default for Snowpipe)', 'File-level atomicity'],
+              ['SKIP_FILE_n', 'Skip file when error count reaches n (e.g., SKIP_FILE_5)', 'Small error tolerance per file'],
+              ['SKIP_FILE_n%', 'Skip file when error percentage reaches n', 'Tolerate small percentage of bad rows'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="VALIDATION_MODE Options">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p><strong>VALIDATION_MODE = RETURN_n_ROWS</strong> — return up to n rows that would be loaded; <strong>NO data loaded</strong></p>
+            <p><strong>VALIDATION_MODE = RETURN_ERRORS</strong> — return all error rows from the load attempt; <strong>NO data loaded</strong></p>
+            <p><strong>VALIDATION_MODE = RETURN_ALL_ERRORS</strong> — historical mode (post-load): query errors after a normal COPY ran with CONTINUE</p>
+            <p>VALIDATION_MODE on a bulk COPY <strong>requires the same target table</strong> — no schema change required</p>
+            <p className="text-red-700 mt-2">Cannot be combined with FORCE; cannot be used with COPY INTO &lt;location&gt; (unloading)</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Loading — Cannot-Do Matrix" badge="5-Point Audit" badgeColor="bg-purple-100 text-purple-700">
+          <CompareTable
+            headers={['Operation', 'Cannot Do', 'Confused With']}
+            rows={[
+              ['PUT', 'Run from Snowsight; copy from a remote machine; rename files; move files between stages', 'COPY — PUT is local→stage, COPY is stage→table'],
+              ['GET', 'Run from Snowsight; download from external stages', 'COPY INTO &lt;location&gt; — that is unload to stage'],
+              ['COPY INTO &lt;table&gt;', 'Transform aggressively (only column SELECT/CAST/UPPER allowed); join multiple files; load Excel/PDF', 'INSERT — COPY is bulk-optimized for staged files'],
+              ['COPY INTO &lt;location&gt;', 'Append to existing files (always creates new); GZIP-rezip existing', 'PUT — UNLOAD is table→stage'],
+              ['Snowpipe', 'Use schema evolution by default (must be enabled); transform aggressively; replace bulk for huge initial loads', 'Bulk COPY — Snowpipe is for continuous micro-batches'],
+              ['Snowpipe Streaming', 'Be triggered by cloud events; use file-based source', 'Snowpipe (file-based) — Streaming is row-based via SDK'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="MATCH_BY_COLUMN_NAME Requirements">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>Works with: <strong>JSON, Avro, ORC, Parquet, CSV (with PARSE_HEADER = TRUE)</strong></p>
+            <p>Modes: <strong>NONE</strong> (default — positional), <strong>CASE_SENSITIVE</strong>, <strong>CASE_INSENSITIVE</strong></p>
+            <p>Source columns missing in target: ignored (no error)</p>
+            <p>Target columns missing in source: filled with NULL</p>
+            <p>Used together with <strong>schema evolution</strong> (ENABLE_SCHEMA_EVOLUTION = TRUE on table) to auto-add new columns</p>
+            <p className="text-red-700 mt-2">Without PARSE_HEADER = TRUE, CSV cannot use MATCH_BY_COLUMN_NAME — falls back to positional</p>
+          </div>
+        </Accordion>
+
         <Traps list={[
           '"STRIP_OUTER_ARRAY is for CSV" = FALSE — JSON only',
           '"SKIP_HEADER = 1 enables MATCH_BY_COLUMN_NAME" = FALSE — need PARSE_HEADER = TRUE',
@@ -837,6 +1448,11 @@ const D3_SECTIONS = [
           '"File loaded 50 days ago, COPY without FORCE: loads again" = FALSE — 50 < 64 → skipped',
           '"File loaded via Snowpipe 10 days ago, same file re-arrives: loads again" = FALSE — 10 < 14 → skipped',
           '"Internal stages can be cloned" = FALSE — external stages CAN',
+          '"PUT default compression is none" = FALSE — GZIP applied automatically',
+          '"ENFORCE_LENGTH defaults FALSE" = FALSE — defaults TRUE (errors on overflow)',
+          '"COPY INTO &lt;location&gt; can append to existing files" = FALSE — always creates new files',
+          '"Excel files can be loaded directly via COPY" = FALSE — must convert to CSV/Parquet first',
+          '"Snowpipe enables schema evolution by default" = FALSE — must be enabled per table',
         ]} />
       </div>
     ),
@@ -897,6 +1513,134 @@ const D3_SECTIONS = [
           </div>
         </Accordion>
 
+        <Accordion title="Snowpipe — Defaults & Limits" badge="Memorize" badgeColor="bg-amber-100 text-amber-700">
+          <CompareTable
+            headers={['Item', 'Default / Limit', 'Notes']}
+            rows={[
+              ['ON_ERROR (Snowpipe)', 'SKIP_FILE', 'Different from bulk COPY'],
+              ['AUTO_INGEST', 'FALSE', 'TRUE = listen to cloud event notifications (S3/SNS, Azure Event Grid, GCS Pub/Sub)'],
+              ['Latency target', '~1 minute', 'Best-effort; not guaranteed real-time'],
+              ['REST API: insertFiles batch', 'Up to 5000 files per call', 'Larger lists rejected'],
+              ['Load history retention', '14 days', 'Files within 14 days deduplicated'],
+              ['Billing', 'Per-file overhead + serverless compute seconds', 'No warehouse credits'],
+              ['Pipe ownership', 'Role that creates it', 'OWNERSHIP transfer changes execution role'],
+              ['Stale pipes', 'Pipe paused if files not flowing', 'Resume manually with ALTER PIPE ... RESUME'],
+              ['Recommended file size', '100–250 MB compressed', 'Same as bulk COPY'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Snowpipe REST API Endpoints">
+          <CompareTable
+            headers={['Endpoint', 'Purpose']}
+            rows={[
+              ['insertFiles', 'Trigger load for a list of files (up to 5000 per call)'],
+              ['insertReport', 'Get per-file load status (returned by Snowpipe)'],
+              ['loadHistoryScan', 'Query load history for a time range (auditing/recovery)'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Snowpipe vs Snowpipe Streaming Cannot-Do" badge="5-Point Audit" badgeColor="bg-purple-100 text-purple-700">
+          <CompareTable
+            headers={['Aspect', 'Snowpipe (file-based)', 'Snowpipe Streaming']}
+            rows={[
+              ['Source', 'Files in stage (S3/Azure/GCS)', 'Direct rows via SDK or Kafka connector v2'],
+              ['Latency', '~1 minute', 'Sub-second to seconds'],
+              ['Cannot do', 'Sub-second latency; ingest a row outside file landing', 'Use cloud event triggers; load from staged files'],
+              ['Idempotency', 'Filename-based dedup (14 d)', 'Channel + offset-based ordering'],
+              ['Parallel client connections', 'Many writers OK', 'Per-channel ordering preserved'],
+              ['Schema evolution', 'Optional (ENABLE_SCHEMA_EVOLUTION)', 'Supported'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Stream Type Variations" badge="Exam Trap" badgeColor="bg-red-100 text-red-700">
+          <CompareTable
+            headers={['Stream Type', 'Tracks', 'Use Case']}
+            rows={[
+              ['Standard', 'INSERT, UPDATE, DELETE', 'Full CDC of changes'],
+              ['APPEND_ONLY', 'INSERT only (UPDATE/DELETE invisible)', 'Faster — only adds matter (e.g., event ingestion)'],
+              ['INSERT_ONLY (external tables)', 'INSERT-equivalent for files added to external stage', 'External-table-style CDC'],
+            ]}
+          />
+          <CodeSnip>{`-- Standard\nCREATE STREAM s ON TABLE t;\n\n-- Append-only\nCREATE STREAM s ON TABLE t APPEND_ONLY = TRUE;\n\n-- External table\nCREATE STREAM s ON EXTERNAL TABLE et INSERT_ONLY = TRUE;`}</CodeSnip>
+        </Accordion>
+
+        <Accordion title="Stream — Defaults & Limits">
+          <CompareTable
+            headers={['Item', 'Default / Limit', 'Notes']}
+            rows={[
+              ['SHOW_INITIAL_ROWS', 'FALSE', 'TRUE on creation = first read returns ALL existing rows'],
+              ['Offset advance', 'After successful DML consumption', 'Read alone doesn\'t advance — must consume in DML'],
+              ['CHANGE_TRACKING required on source', 'YES (auto-enabled when stream is created)', 'Stream creation enables it implicitly'],
+              ['Stale threshold', 'Source table retention (extension cap = 14 days default)', 'Past this → stale, must drop/recreate'],
+              ['ALTER STREAM', 'Limited (cannot refresh stale)', 'Can only change comments/tags'],
+              ['SYSTEM$STREAM_HAS_DATA', 'Returns TRUE/FALSE', 'Used in WHEN clauses on tasks'],
+              ['Multiple streams on one table', 'Allowed', 'Each has its own offset'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Task — Defaults & Limits">
+          <CompareTable
+            headers={['Item', 'Default / Limit', 'Notes']}
+            rows={[
+              ['Min schedule (warehouse task)', '1 minute', 'CRON or interval'],
+              ['Min schedule (serverless task)', '~10 seconds', 'Newer feature'],
+              ['Max DAG depth', '1000 tasks', 'Across all predecessors+children'],
+              ['Max children per parent', '~100', 'Soft limit'],
+              ['ALLOW_OVERLAPPING_EXECUTION', 'FALSE', 'TRUE = run new instance even if previous still running'],
+              ['USER_TASK_TIMEOUT_MS', '3,600,000 (1 hour)', 'Max task runtime; auto-fails after'],
+              ['SUSPEND_TASK_AFTER_NUM_FAILURES', '0 (disabled)', 'N consecutive failures → auto-suspend'],
+              ['Privilege to start', 'OPERATE on task + EXECUTE TASK on account (for resume)', 'Plus USAGE on warehouse if not serverless'],
+              ['CRON timezone', 'Mandatory in CRON expression', 'e.g., "USING CRON 0 9 * * MON America/New_York"'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Task DAG Rules">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>Only the <strong>root task has a SCHEDULE</strong> — children are triggered by predecessors</p>
+            <p>Use <code className="bg-slate-100 px-1 rounded">AFTER &lt;task&gt;</code> in CREATE TASK to define predecessors</p>
+            <p>A child can have <strong>multiple predecessors</strong> (waits for ALL by default)</p>
+            <p>Tasks cannot share schedules — only ONE root per DAG</p>
+            <p>RESUMING a child without a resumed root → never runs (no scheduler)</p>
+            <p>Suspending root suspends DAG; suspending a child only stops that branch</p>
+            <p className="text-red-700 mt-2">DAG cycles are rejected at CREATE/ALTER time</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Dynamic Tables — Defaults & Limits">
+          <CompareTable
+            headers={['Item', 'Default / Limit', 'Notes']}
+            rows={[
+              ['TARGET_LAG', 'Required — DOWNSTREAM or interval', 'DOWNSTREAM = inherit from downstream consumers'],
+              ['Min TARGET_LAG', '1 minute', 'Below this is rejected'],
+              ['Refresh mode', 'AUTO (incremental when possible)', 'Falls back to FULL when query not incrementalable'],
+              ['INITIALIZE', 'ON_CREATE (default)', 'ON_SCHEDULE delays first refresh'],
+              ['Cannot DML directly', 'Read-only target', 'Use refresh, not INSERT/UPDATE/DELETE'],
+              ['Supports JOIN, UNION, window funcs?', 'YES', 'Unlike materialized views'],
+              ['Cloning', 'NOT supported', 'Cannot clone DT'],
+              ['Replication', 'Supported', 'Via replication groups'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Snowpipe vs Tasks vs Streams vs Dynamic Tables — Confusion Matrix">
+          <CompareTable
+            headers={['Capability', 'Snowpipe', 'Tasks', 'Streams', 'Dynamic Tables']}
+            rows={[
+              ['Triggers on file landing', 'YES', 'NO', 'NO', 'NO'],
+              ['Continuous transformation', 'NO', 'YES (via SQL)', 'NO (just CDC)', 'YES (declarative)'],
+              ['Maintains state', 'Filename hashes', 'No state', 'Offset', 'Materialized result'],
+              ['Schedule', '~1 min event', 'CRON/interval', 'N/A — passive', 'TARGET_LAG'],
+              ['Compute', 'Serverless', 'Warehouse OR serverless', 'No compute (metadata)', 'Serverless'],
+              ['Imperative SQL', 'COPY (one statement)', 'Any SQL', 'N/A', 'Single SELECT'],
+            ]}
+          />
+        </Accordion>
+
         <Traps list={[
           '"Snowpipe uses a user warehouse" = FALSE — serverless',
           '"Snowpipe Streaming requires staging files" = FALSE — direct row insertion',
@@ -904,6 +1648,13 @@ const D3_SECTIONS = [
           '"Child tasks in a DAG can have their own SCHEDULE" = FALSE — root task only',
           '"WHEN FALSE = task runs but processes 0 rows" = FALSE — task is skipped, no compute',
           '"Dynamic tables are limited to one base table like MVs" = FALSE — support JOINs',
+          '"insertFiles can take 10000 files per call" = FALSE — 5000 max',
+          '"APPEND_ONLY streams capture UPDATEs" = FALSE — only INSERTs',
+          '"INSERT_ONLY streams work on internal tables" = FALSE — external tables only',
+          '"Reading from a stream advances its offset" = FALSE — offset only advances on consuming DML',
+          '"Tasks can have CRON without a timezone" = FALSE — timezone is mandatory in CRON',
+          '"Multiple streams on one table conflict" = FALSE — each tracks its own offset independently',
+          '"USER_TASK_TIMEOUT_MS default is unlimited" = FALSE — defaults to 3,600,000 ms (1 hour)',
         ]} />
       </div>
     ),
@@ -938,10 +1689,71 @@ const D3_SECTIONS = [
           />
         </Accordion>
 
+        <Accordion title="Driver Defaults & Behaviors" badge="Memorize" badgeColor="bg-amber-100 text-amber-700">
+          <CompareTable
+            headers={['Driver / Connector', 'Default Auth', 'Notable Default']}
+            rows={[
+              ['Python Connector', 'Username/password', 'Auto-commit ON; supports paramstyle = "pyformat"'],
+              ['JDBC Driver', 'Username/password', 'Connection pool not built-in (use HikariCP)'],
+              ['ODBC Driver', 'Username/password', 'Compatible with BI tools (Tableau, Power BI)'],
+              ['Spark Connector', 'Username/password or key-pair', 'Pushdown enabled by default; reads via internal stage'],
+              ['Kafka Connector v1', 'Key-pair only (no username/password)', 'Stages files internally, then Snowpipe loads'],
+              ['Kafka Connector v2 / Snowpipe Streaming', 'Key-pair only', 'Direct row writes via SDK; no file staging'],
+              ['Node.js / Go / .NET / PHP', 'Username/password (also OAuth, JWT)', 'Newer drivers support modern auth'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Storage Integration — Cloud Provider Specifics">
+          <CompareTable
+            headers={['Cloud', 'Snowflake side', 'Customer side']}
+            rows={[
+              ['AWS S3', 'STORAGE_AWS_ROLE_ARN, AWS_EXTERNAL_ID', 'Customer creates IAM Role with trust policy back to Snowflake'],
+              ['Azure Blob/ADLS', 'STORAGE_AZURE_TENANT_ID, AZURE_CONSENT_URL', 'Admin consents to Snowflake app in Azure AD'],
+              ['GCS', 'STORAGE_GCP_SERVICE_ACCOUNT', 'Customer grants role to that GCP service account'],
+            ]}
+          />
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mt-2 text-xs space-y-1">
+            <p>Storage integrations are <strong>not credentials</strong> — they are trust relationships</p>
+            <p>The Snowflake account already has an identity in your cloud — you grant it permissions on YOUR storage</p>
+            <p>One integration = many stages can use it (don\'t need integration per stage)</p>
+            <p className="text-red-700">Cannot use cross-cloud (e.g., one integration cannot mix S3 + Azure)</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Integration Type — Cannot-Do Matrix" badge="5-Point Audit" badgeColor="bg-purple-100 text-purple-700">
+          <CompareTable
+            headers={['Integration', 'Cannot Do', 'Confused With']}
+            rows={[
+              ['Storage integration', 'Authenticate to non-cloud storage; use across multiple clouds', 'External stage — storage integration is the trust, stage is the URL'],
+              ['API integration', 'Load data via SELECT (use COPY); replace external stages', 'Storage integration — different trust; API integration is for HTTPS endpoints'],
+              ['Notification integration', 'Send arbitrary HTTP webhooks (must be Snowflake-supported targets)', 'API integration — notifications are limited to email/SNS/Pub/Sub/Event Grid'],
+              ['Git integration', 'Replace external stages; version data', 'External stage — Git syncs code files (SQL, Python, etc.)'],
+              ['Security integration', 'Authenticate users (it integrates IdP); replace user table', 'Storage integration — different concept'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="PrivateLink (Network Connectivity)">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p><strong>AWS PrivateLink</strong>, <strong>Azure Private Link</strong>, <strong>GCP Private Service Connect</strong></p>
+            <p>Edition gate: <strong>Business Critical+</strong> (or specifically licensed Enterprise in some cases)</p>
+            <p>Provides a private endpoint in the customer\'s VPC — traffic never traverses the public internet</p>
+            <p>Each region has its own PrivateLink endpoint (cross-region requires separate setup)</p>
+            <p>Supports both inbound (clients → Snowflake) and outbound (Snowflake → customer services) configurations</p>
+            <p className="text-red-700">PrivateLink does not provide compliance by itself — pair with Tri-Secret Secure for full BC features</p>
+          </div>
+        </Accordion>
+
         <Traps list={[
           '"Storage integration stores AWS keys" = FALSE — stores Snowflake IAM user ARN; customer grants trust',
           '"API integration is for loading data from REST APIs" = FALSE — for external functions and notifications',
           '"Git integration versions table data" = FALSE — syncs code files (SQL, Python)',
+          '"Kafka Connector uses username/password" = FALSE — key-pair only',
+          '"Spark Connector reads directly without staging" = FALSE — uses internal stage under the hood',
+          '"Storage integration works across clouds" = FALSE — one cloud per integration',
+          '"PrivateLink is available on Standard edition" = FALSE — Business Critical+',
+          '"Notification integration sends arbitrary webhooks" = FALSE — limited to supported targets (email, SNS, Pub/Sub, Event Grid)',
         ]} />
       </div>
     ),
@@ -1020,6 +1832,56 @@ const D4_SECTIONS = [
           </div>
         </Accordion>
 
+        <Accordion title="Query Profile — Reading the Numbers" badge="Memorize" badgeColor="bg-amber-100 text-amber-700">
+          <CompareTable
+            headers={['Indicator', 'Where', 'What "bad" looks like']}
+            rows={[
+              ['Partitions Scanned / Partitions Total', 'TableScan operator', 'Ratio close to 1 → poor pruning'],
+              ['Bytes Scanned', 'TableScan', 'Always check — but only meaningful with Total context'],
+              ['Bytes Scanned from Cache', 'TableScan', 'Low % = no SSD reuse (cold WH)'],
+              ['Bytes Spilled to Local', 'Sort/Aggregate/Join', 'Any value = WH memory exceeded — moderate'],
+              ['Bytes Spilled to Remote', 'Sort/Aggregate/Join', 'Any value = SEVERE — both memory AND SSD exceeded'],
+              ['Output rows >> input rows in JOIN', 'Join operator', 'Exploding join → bad join condition'],
+              ['Pruning by Search Optimization Service', 'TableScan', 'Indicates SOS is being used'],
+              ['Time spent in remote disk I/O', 'Per-operator', 'High = poor pruning or no clustering'],
+              ['Time spent in synchronization', 'Per-operator', 'High = waiting on shuffles or joins'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Query Profile Operators — What They Mean">
+          <CompareTable
+            headers={['Operator', 'Function']}
+            rows={[
+              ['TableScan', 'Read micro-partitions from storage (or cache)'],
+              ['Filter', 'Apply WHERE predicates'],
+              ['Join (Inner/Left/Right/Full)', 'Combine two inputs based on key'],
+              ['Aggregate', 'GROUP BY / aggregations'],
+              ['Sort', 'ORDER BY / window function partitioning'],
+              ['Result', 'Final returned rows'],
+              ['Generator', 'TABLE(GENERATOR(...)) — synthetic rows'],
+              ['Flatten', 'Explode VARIANT array/object into rows'],
+              ['UnionAll / Union', 'Combine multiple inputs'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Performance Symptoms — What to Fix" badge="5-Point Audit" badgeColor="bg-purple-100 text-purple-700">
+          <CompareTable
+            headers={['Symptom', 'Root Cause', 'Fix', 'NOT a Fix']}
+            rows={[
+              ['Single query slow + spilling to remote', 'WH memory exceeded', 'Scale UP (larger WH); SELECT fewer columns', 'Multi-cluster (no help)'],
+              ['Many users queuing', 'Concurrency exceeded WH capacity', 'Scale OUT (multi-cluster) or dedicated WH', 'Larger WH alone'],
+              ['High Partitions Scanned ratio', 'Filter not aligned with clustering / no clustering', 'Add clustering key; rewrite filter; SOS for selective lookups', 'Larger WH'],
+              ['Repeated identical queries slow', 'Result cache miss', 'Verify USE_CACHED_RESULT = TRUE; check non-deterministic functions', 'Larger WH'],
+              ['Aggregation queries slow + repetitive', 'No materialization', 'Materialized View (Enterprise+) or Dynamic Table', 'Clustering key (less effective)'],
+              ['Highly selective lookups slow', 'High-cardinality predicate, no index', 'Search Optimization Service', 'Clustering (for ranges, not point lookups)'],
+              ['Large ad-hoc scan with selective filter', 'Pre-aggregation impractical, ad-hoc query', 'Query Acceleration Service', 'Larger WH (under-utilizes)'],
+              ['Exploding joins', 'Cartesian-style join from missing key', 'Fix join condition; deduplicate input', 'Larger WH'],
+            ]}
+          />
+        </Accordion>
+
         <Traps list={[
           '"Spilling to local = critical" = FALSE — moderate; REMOTE spilling is critical',
           '"Exploding joins = out of memory" = FALSE — means Cartesian product from bad join condition',
@@ -1027,6 +1889,9 @@ const D4_SECTIONS = [
           '"Multi-cluster fixes spilling" = FALSE — Scale UP fixes spilling; Scale OUT fixes queueing',
           '"SELECT triggers re-clustering" = FALSE — only DML (INSERT/UPDATE/DELETE/MERGE/COPY)',
           '"Bytes Scanned attribute alone proves bad pruning" = FALSE — compare Partitions Scanned vs Partitions Total',
+          '"Repeated query slow → larger warehouse" = FALSE — first verify cache rules; non-deterministic funcs break cache',
+          '"Slow aggregation → clustering key" = FALSE — MV or Dynamic Table is the right answer',
+          '"Highly selective point lookup → clustering" = FALSE — Search Optimization Service is the right answer',
         ]} />
       </div>
     ),
@@ -1085,12 +1950,78 @@ const D4_SECTIONS = [
           </div>
         </Accordion>
 
+        <Accordion title="Optimization Service — Defaults & Limits" badge="Memorize" badgeColor="bg-amber-100 text-amber-700">
+          <CompareTable
+            headers={['Service', 'Default / Limit', 'Notes']}
+            rows={[
+              ['QAS — ENABLE_QUERY_ACCELERATION', 'FALSE', 'Per-warehouse opt-in'],
+              ['QAS — MAX_SCALE_FACTOR', '8 (default), 100 (max)', 'Multiplier on additional compute'],
+              ['QAS billing', 'Serverless credits', 'Tracked in QUERY_ACCELERATION_HISTORY'],
+              ['SOS billing', 'Serverless storage + maintenance', 'Per-column overhead'],
+              ['SOS edition', 'Enterprise+', 'Not Standard'],
+              ['MV edition', 'Enterprise+', 'Not Standard'],
+              ['Auto-clustering billing', 'Serverless credits', 'NOT user-warehouse — separate budget'],
+              ['Auto-clustering edition', 'All editions support clustering, but auto-clustering is recommended on Enterprise+', 'Cluster key DDL allowed everywhere'],
+              ['Dynamic Table edition', 'Enterprise (recommended)', 'TARGET_LAG-driven serverless refresh'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Optimization Confusion Matrix" badge="5-Point Audit" badgeColor="bg-purple-100 text-purple-700">
+          <CompareTable
+            headers={['Service', 'Best For', 'Cannot Help With']}
+            rows={[
+              ['Clustering key', 'Range scans on low-medium cardinality (DATE/TIMESTAMP); large tables (>1 TB)', 'Highly selective point lookups; tiny tables; high-cardinality lookups'],
+              ['Search Optimization Service', 'Equality lookups on high-cardinality columns (e.g., WHERE id = 12345)', 'Range scans; aggregations; tiny tables (overhead dominates)'],
+              ['Materialized View', 'Repetitive aggregation/filter on a single table', 'JOINs; transient/temp tables; tiny tables'],
+              ['Dynamic Table', 'Continuous transformation including JOINs', 'Sub-minute latency (use Streams + Tasks); read-heavy without transformation'],
+              ['Query Acceleration Service', 'Ad-hoc queries with large scans + selective filter', 'Data loading; DDL; small queries; stored procedure bodies'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="What Each Optimization CANNOT Help With">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs space-y-1">
+            <p className="font-bold text-red-700">Clustering CANNOT:</p>
+            <p>✗ Replace SOS for high-cardinality point lookups</p>
+            <p>✗ Reorganize external tables or transient tables (clustering on transient is often pointless)</p>
+            <p>✗ Be applied to columns with deterministic-only functions (e.g., expressions are limited)</p>
+            <p className="font-bold text-red-700 mt-2">Search Optimization CANNOT:</p>
+            <p>✗ Help with range queries (BETWEEN, &gt;, &lt;)</p>
+            <p>✗ Be added to columns of certain types (geography, semi-structured access paths varies)</p>
+            <p>✗ Replace clustering for sequential scans</p>
+            <p className="font-bold text-red-700 mt-2">Materialized Views CANNOT:</p>
+            <p>✗ Use JOINs, UNIONs, ORDER BY, HAVING, LIMIT, window functions, non-deterministic functions</p>
+            <p>✗ Be created on transient or temporary tables</p>
+            <p>✗ Be created in Standard Edition</p>
+            <p className="font-bold text-red-700 mt-2">QAS CANNOT:</p>
+            <p>✗ Accelerate DDL or DML</p>
+            <p>✗ Accelerate stored procedure bodies (only individual queries)</p>
+            <p>✗ Replace clustering — QAS scans more data, just with more compute</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Re-clustering — When Snowflake Acts">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>Snowflake auto-reclusters tables that drift past a threshold (depth-based)</p>
+            <p>Triggered when: <strong>data is modified</strong> (INSERT/UPDATE/DELETE/MERGE/COPY)</p>
+            <p>NOT triggered by: SELECT, SHOW, DESCRIBE, USE, EXPLAIN</p>
+            <p><code className="bg-slate-100 px-1 rounded">SYSTEM$CLUSTERING_INFORMATION</code> shows depth and partition stats</p>
+            <p>Use <code className="bg-slate-100 px-1 rounded">ALTER TABLE ... SUSPEND/RESUME RECLUSTER</code> to control</p>
+            <p>Re-clustering uses serverless credits (not your warehouse)</p>
+          </div>
+        </Accordion>
+
         <Traps list={[
           '"SOS clusters the table" = FALSE — creates access paths, does not reorganize',
           '"Clustering key on high-cardinality column (unique per row)" = BAD — expensive reclustering',
           '"MV supports JOINs" = FALSE — use Dynamic Tables for JOINs',
           '"QAS works for data loading" = FALSE — for queries only',
           '"Resource monitors track automatic clustering credits" = FALSE — use budgets',
+          '"QAS_MAX_SCALE_FACTOR can be 1000" = FALSE — max is 100',
+          '"SOS works on Standard Edition" = FALSE — Enterprise+',
+          '"Reclustering happens for SELECT activity" = FALSE — only DML triggers it',
+          '"Clustering helps a 10 GB table" = FALSE typically — recommended for tables &gt; ~1 TB',
         ]} />
       </div>
     ),
@@ -1139,6 +2070,53 @@ const D4_SECTIONS = [
           </div>
         </Accordion>
 
+        <Accordion title="Cache Defaults & Hard Limits" badge="Memorize" badgeColor="bg-amber-100 text-amber-700">
+          <CompareTable
+            headers={['Cache', 'TTL', 'Hard Limit', 'Disable Method']}
+            rows={[
+              ['Result cache', '24 h per reuse', 'Max 31 days if continuously reused', 'USE_CACHED_RESULT = FALSE'],
+              ['Metadata cache', 'Always fresh (auto-updated)', 'No size limit', 'Cannot disable'],
+              ['Warehouse SSD cache', 'While running', 'Bounded by node SSD size', 'Suspend warehouse → wiped'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Cache — What Each CANNOT Cache" badge="5-Point Audit" badgeColor="bg-purple-100 text-purple-700">
+          <CompareTable
+            headers={['Cache', 'CANNOT Cache']}
+            rows={[
+              ['Result cache', 'Queries with non-deterministic functions (CURRENT_TIMESTAMP, RANDOM, UUID); queries against external tables (limited); queries with policies that returned different output last time; queries calling external functions; queries on data that changed; queries from a SHOW command'],
+              ['Metadata cache', 'Computations beyond row counts/min/max/distinct; query results; user-defined function bodies'],
+              ['Warehouse SSD cache', 'Result rows (those go to result cache); raw data after suspend (wiped)'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Result Cache — Confusing Edge Cases">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p><strong>Different roles, same query, masked column:</strong> different cache entries (output differs)</p>
+            <p><strong>Different roles, same query, no policy on cols:</strong> same cache entry can be reused</p>
+            <p><strong>Different warehouses, same query:</strong> SAME cache entry — result cache is account-level (Cloud Services)</p>
+            <p><strong>NO warehouse running, same query:</strong> SAME cache entry served (no compute needed)</p>
+            <p><strong>Whitespace-only difference in query text:</strong> cache MISS — query text must match character-by-character</p>
+            <p><strong>Different alias on a column:</strong> cache MISS</p>
+            <p><strong>Underlying table altered (column added/dropped):</strong> cache invalidated</p>
+            <p><strong>Underlying table TRUNCATEd:</strong> cache invalidated</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Metadata-Only Queries (No Warehouse Needed)">
+          <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 text-xs space-y-1">
+            <p>These can be answered without spinning up a warehouse:</p>
+            <p>✓ <code className="bg-slate-100 px-1 rounded">SELECT COUNT(*) FROM table</code> (no WHERE)</p>
+            <p>✓ <code className="bg-slate-100 px-1 rounded">SELECT MIN(col), MAX(col) FROM table</code> if metadata available</p>
+            <p>✓ <code className="bg-slate-100 px-1 rounded">SHOW</code> commands (tables, schemas, etc.)</p>
+            <p>✓ <code className="bg-slate-100 px-1 rounded">DESCRIBE</code> commands</p>
+            <p>✓ <code className="bg-slate-100 px-1 rounded">SELECT CURRENT_VERSION()</code></p>
+            <p className="text-red-700 mt-2">A WHERE clause typically forces a warehouse to scan partitions</p>
+          </div>
+        </Accordion>
+
         <Traps list={[
           '"Result cache requires the same warehouse" = FALSE — account-level, any warehouse hits it',
           '"Result cache persists indefinitely" = FALSE — 24 h per reuse, hard max 31 days',
@@ -1146,6 +2124,10 @@ const D4_SECTIONS = [
           '"Two users, same query, different roles, table has masking policy → share cache" = FALSE — role-specific',
           '"COUNT(*) requires a warehouse" = FALSE — can be answered from metadata cache',
           '"CURRENT_DATE() in a query hits the result cache" = FALSE — non-deterministic, always re-executes',
+          '"Result cache invalidates only when DML changes data" = FALSE — also invalidated by ALTER TABLE, policy changes, query text change',
+          '"Whitespace differences are normalized for cache lookup" = FALSE — exact text match required',
+          '"USE_CACHED_RESULT must be enabled per session" = FALSE — TRUE by default',
+          '"SHOW commands consume warehouse credits" = FALSE — answered from metadata',
         ]} />
       </div>
     ),
@@ -1222,6 +2204,89 @@ const D4_SECTIONS = [
           </div>
         </Accordion>
 
+        <Accordion title="Procedure vs UDF — Cannot-Do Matrix" badge="5-Point Audit" badgeColor="bg-purple-100 text-purple-700">
+          <CompareTable
+            headers={['Capability', 'Stored Procedure', 'Scalar UDF', 'UDTF (Table UDF)']}
+            rows={[
+              ['Execute DDL', 'YES', 'NO', 'NO'],
+              ['Execute DML', 'YES', 'NO', 'NO'],
+              ['Begin/commit transactions', 'YES', 'NO', 'NO'],
+              ['Return type', 'Single scalar', 'Scalar', 'Tabular (rows)'],
+              ['Be called in SELECT', 'NO (must CALL)', 'YES (in expression)', 'YES (via TABLE() syntax)'],
+              ['Run in caller\'s privileges', 'Optional (EXECUTE AS CALLER)', 'Always caller', 'Always caller'],
+              ['Cache results', 'NO', 'YES (deterministic only)', 'NO'],
+              ['Languages', 'SQL, JavaScript, Python, Java, Scala', 'SQL, JS, Python, Java, Scala', 'Same'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="EXECUTE AS — OWNER vs CALLER">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p><strong>EXECUTE AS OWNER (default):</strong> Procedure runs with the OWNER\'s privileges. Caller doesn\'t need privileges on referenced objects.</p>
+            <p><strong>EXECUTE AS CALLER:</strong> Procedure runs with the CALLER\'s privileges. Caller needs all privileges on referenced objects.</p>
+            <p>UDFs always run as caller — no EXECUTE AS keyword</p>
+            <p className="text-red-700 mt-2">EXECUTE AS OWNER is dangerous if a high-privilege role owns a procedure that a low-privilege role can call — privilege escalation risk</p>
+            <p>Best practice: use EXECUTE AS CALLER for routines that should respect caller permissions</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Function Confusion — Lookalikes & Edge Cases">
+          <CompareTable
+            headers={['Group', 'Functions', 'Key Difference']}
+            rows={[
+              ['NULL handling', 'NVL / NVL2 / IFNULL / COALESCE', 'NVL = COALESCE 2-arg; NVL2 has 3 args; IFNULL synonym for NVL'],
+              ['Conditional', 'IFF / DECODE / CASE', 'IFF is short ternary; DECODE = old SQL CASE-WHEN-equality'],
+              ['JSON parse', 'PARSE_JSON / TO_JSON / TO_VARIANT', 'PARSE_JSON: string→variant; TO_JSON: variant→string; TO_VARIANT: any→variant cast'],
+              ['Object build', 'OBJECT_CONSTRUCT / OBJECT_AGG', 'CONSTRUCT = single row; AGG = aggregate from many rows'],
+              ['Aggregation', 'LISTAGG / ARRAY_AGG / GROUP_CONCAT', 'GROUP_CONCAT does not exist in Snowflake; LISTAGG returns string; ARRAY_AGG returns array'],
+              ['Hashing', 'HASH / HASH_AGG / MD5', 'HASH = single value hash; HASH_AGG = whole table hash; MD5 = string MD5'],
+              ['Date diff', 'DATEDIFF / TIMESTAMPDIFF', 'TIMESTAMPDIFF is alias for DATEDIFF'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="VARIANT Path Syntax — Common Pitfalls">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p><strong>Valid:</strong> <code className="bg-slate-100 px-1 rounded">data:user.name</code></p>
+            <p><strong>Valid:</strong> <code className="bg-slate-100 px-1 rounded">data:user:name</code></p>
+            <p><strong>Valid:</strong> <code className="bg-slate-100 px-1 rounded">data:items[0].id</code></p>
+            <p><strong>INVALID:</strong> <code className="bg-slate-100 px-1 rounded">data.user.name</code> (cannot start path with dot — must use colon for first level)</p>
+            <p><strong>VALID alternative:</strong> <code className="bg-slate-100 px-1 rounded">GET_PATH(data, 'user.name')</code></p>
+            <p>Extracted values are VARIANT — must <code className="bg-slate-100 px-1 rounded">::VARCHAR</code> or <code className="bg-slate-100 px-1 rounded">::INTEGER</code> to get native type</p>
+            <p>Comparing VARIANT to literal string without cast may fail or behave unexpectedly</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Transaction Behavior — Defaults & Auto-Commits">
+          <CompareTable
+            headers={['Statement Type', 'Auto-Commit Behavior']}
+            rows={[
+              ['DDL (CREATE, ALTER, DROP)', 'Auto-commits (always)'],
+              ['DML (INSERT/UPDATE/DELETE/MERGE)', 'Inside transaction if BEGIN was issued; otherwise auto-commits'],
+              ['SELECT (read)', 'No transaction effect'],
+              ['BEGIN / COMMIT / ROLLBACK', 'Explicit transaction control'],
+              ['CALL stored_procedure(...)', 'Procedure runs in implicit transaction; can manage own'],
+              ['Multi-statement transaction', 'Requires BEGIN; ends with COMMIT or ROLLBACK'],
+            ]}
+          />
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-2 text-xs">
+            <p className="font-bold text-amber-700">DDL within a transaction → auto-commits</p>
+            <p className="text-slate-700 mt-1">Any DDL statement (CREATE TABLE, ALTER, DROP) commits any prior open transaction. There is no "DDL within transaction" semantics.</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="MERGE Behavior — Single-Row vs Multi-Row Match">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p><strong>ERROR_ON_NONDETERMINISTIC_MERGE</strong> session parameter — default <strong>TRUE</strong></p>
+            <p>If multiple source rows match one target row → ERROR by default (prevents undefined winner)</p>
+            <p>Set FALSE to allow non-deterministic last-wins behavior (not recommended)</p>
+            <p>Best practice: deduplicate source with QUALIFY ROW_NUMBER() = 1 before MERGE</p>
+            <p>WHEN MATCHED branch can have UPDATE or DELETE (or both with conditions)</p>
+            <p>WHEN NOT MATCHED branch can only have INSERT</p>
+            <p>WHEN NOT MATCHED BY SOURCE can have DELETE (Snowflake-specific extension)</p>
+          </div>
+        </Accordion>
+
         <Traps list={[
           '"QUALIFY is the same as HAVING" = FALSE — QUALIFY = window functions, HAVING = aggregates',
           '"NVL2 returns the second arg when NULL" = FALSE — returns THIRD arg when NULL',
@@ -1231,6 +2296,11 @@ const D4_SECTIONS = [
           '"UDFs can execute INSERT statements" = FALSE — only stored procedures',
           '"External functions run on the Snowflake warehouse" = FALSE — run on external service',
           '"ERROR_ON_NONDETERMINISTIC_MERGE defaults to FALSE" = FALSE — it defaults to TRUE (errors on ambiguous match)',
+          '"DDL inside BEGIN...COMMIT is part of the transaction" = FALSE — DDL auto-commits',
+          '"data.user.name is valid VARIANT path syntax" = FALSE — must start with colon: data:user.name',
+          '"Stored procedures can be called in a SELECT expression" = FALSE — must use CALL',
+          '"EXECUTE AS OWNER is the safer default" = NUANCED — protects callers from needing privileges, but creates escalation risk if owner has high privileges',
+          '"UDFs can begin/commit transactions" = FALSE — only procedures',
         ]} />
       </div>
     ),
@@ -1326,6 +2396,79 @@ const D5_SECTIONS = [
           </div>
         </Accordion>
 
+        <Accordion title="Time Travel — All Forms of Reference" badge="Memorize" badgeColor="bg-amber-100 text-amber-700">
+          <CodeSnip>{`-- AT vs BEFORE\nSELECT * FROM t AT(OFFSET => -300);     -- 300 SECONDS ago (now-300s)\nSELECT * FROM t AT(TIMESTAMP => '2026-01-01 12:00:00'::TIMESTAMP_NTZ);\nSELECT * FROM t AT(STATEMENT => '01abcd...');  -- query ID — at moment that query ran\nSELECT * FROM t BEFORE(STATEMENT => '01abcd...'); -- just BEFORE that statement\nSELECT * FROM t BEFORE(TIMESTAMP => '...');\n\n-- UNDROP\nUNDROP TABLE my_dropped_table;`}</CodeSnip>
+          <CompareTable
+            headers={['Reference', 'Meaning']}
+            rows={[
+              ['OFFSET', 'Negative seconds from now (e.g., -300 = 5 minutes ago)'],
+              ['TIMESTAMP', 'Specific timestamp; rounded to micro-partition closest to time'],
+              ['STATEMENT', 'Query ID; AT = at the moment the statement ran; BEFORE = just before'],
+              ['UNDROP', 'Restore most-recently-dropped object of the same name'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Time Travel CANNOT" badge="5-Point Audit" badgeColor="bg-purple-100 text-purple-700">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs space-y-1">
+            <p>✗ Be used on external tables (no AT/BEFORE clause)</p>
+            <p>✗ Recover dropped warehouses (warehouses don\'t have Time Travel)</p>
+            <p>✗ Recover dropped views (views are not stored data)</p>
+            <p>✗ Recover dropped stages, pipes (not Time Travel-able)</p>
+            <p>✗ Be used after DATA_RETENTION = 0 — Time Travel is disabled</p>
+            <p>✗ Span more than the table\'s retention setting at the moment of the action</p>
+            <p>✗ Be extended retroactively after expiration — once expired, data is gone</p>
+            <p>✗ Coexist with secondary read replicas in some replication contexts</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Cloning — Defaults & Behaviors">
+          <CompareTable
+            headers={['Detail', 'Behavior']}
+            rows={[
+              ['Storage at clone time', 'Zero — clone shares micro-partitions until divergence'],
+              ['Snapshot moment', 'When CREATE ... CLONE is INITIATED (not when it completes)'],
+              ['Concurrent DML on source', 'NOT visible in clone (clone is point-in-time)'],
+              ['Privileges on clone', 'Inherits container privileges (e.g., schema-level grants); object-level privileges NOT cloned by default'],
+              ['COPY GRANTS option', 'CREATE ... CLONE ... COPY GRANTS — replicate object-level grants'],
+              ['Streams on cloned source', 'Cloned object can have NEW streams; source stream offset is independent'],
+              ['Tasks in clone', 'Cloned in SUSPENDED state — must manually resume'],
+              ['Pipes in clone', 'Cloned SUSPENDED; load history NOT cloned (re-loads possible)'],
+              ['External tables', 'NOT cloned — excluded entirely from DB clones'],
+              ['Internal stages', 'NOT cloned (Unsupported feature error)'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Replication & Failover — Defaults & Limits">
+          <CompareTable
+            headers={['Item', 'Default / Limit', 'Notes']}
+            rows={[
+              ['Replication group', 'Manual create; objects must be added explicitly', 'Read-only on secondary'],
+              ['Failover group', 'Manual create; subset of replication groups', 'Allows promote secondary → primary'],
+              ['Edition for replication', 'All editions (basic database replication available)', 'Cross-region/cloud also available'],
+              ['Edition for failover', 'Business Critical+ on BOTH source and target', 'Hard requirement'],
+              ['Schedule', 'Default = ON_DEMAND (manual REFRESH)', 'Can be scheduled (e.g., every 60 min)'],
+              ['Replicable objects', 'DBs, shares, roles, users, warehouses, integrations, network policies', 'NOT: stages (internal), tasks history, query history'],
+              ['Direction', 'One-way at a time', 'Promote secondary to flip direction'],
+              ['Time Travel after failover', 'Inherits target retention settings', 'Pre-failover history is target-side only'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="What Cannot Be Replicated">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs space-y-1">
+            <p>✗ Internal stages (named) — only external stages metadata replicated</p>
+            <p>✗ Streams — must be recreated post-failover</p>
+            <p>✗ Tasks — replicated as objects, but execution state varies</p>
+            <p>✗ Query history / load history</p>
+            <p>✗ Result cache</p>
+            <p>✗ Account-level metadata that doesn\'t belong to a replication group</p>
+            <p>✗ Reader accounts (must be recreated)</p>
+            <p>✗ Some integrations (storage, API, notification — verify each)</p>
+          </div>
+        </Accordion>
+
         <Traps list={[
           '"CREATE TABLE ... CLONE transient_table" = FAILS — must say CREATE TRANSIENT TABLE ... CLONE',
           '"External tables are included in database clones" = FALSE — excluded entirely',
@@ -1336,6 +2479,11 @@ const D5_SECTIONS = [
           '"Transient tables have 1-day Fail-safe" = FALSE — 0 days always',
           '"Replication group supports failover" = FALSE — that is failover group',
           '"Replicated databases are writable on the secondary" = FALSE — read-only until failover',
+          '"AT(OFFSET => -300) means 300 minutes ago" = FALSE — 300 SECONDS ago',
+          '"Cloning automatically copies object-level grants" = FALSE — must specify COPY GRANTS',
+          '"Failover groups work on Standard edition" = FALSE — Business Critical+',
+          '"UNDROP works on dropped views" = FALSE — views are not Time Travel-able',
+          '"Clone of a pipe inherits its load history" = FALSE — pipes cloned suspended; load history NOT cloned',
         ]} />
       </div>
     ),
@@ -1401,6 +2549,88 @@ const D5_SECTIONS = [
           />
         </Accordion>
 
+        <Accordion title="Share — Defaults & Limits" badge="Memorize" badgeColor="bg-amber-100 text-amber-700">
+          <CompareTable
+            headers={['Item', 'Default / Limit', 'Notes']}
+            rows={[
+              ['Privilege to create share', 'ACCOUNTADMIN (or CREATE SHARE granted)', 'Cannot delegate to SECURITYADMIN by default'],
+              ['Share scope', 'Account-level object', 'Not in any database'],
+              ['Direct share scope', 'Same region only', 'Cross-region requires Listings'],
+              ['Reader account limit (default)', '20 per provider account', 'Hard default; raise with Support'],
+              ['Consumer storage charge', '0 (provider pays)', 'Zero-copy share — no consumer storage'],
+              ['Consumer compute charge', 'Consumer\'s own warehouse', 'Reader Accounts: provider pays'],
+              ['Number of consumers per share', 'No documented limit', 'Add accounts via ALTER SHARE'],
+              ['Share refresh cadence', 'Real-time (no manual refresh)', 'Consumer sees changes immediately'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Share Type Confusion Matrix" badge="5-Point Audit" badgeColor="bg-purple-100 text-purple-700">
+          <CompareTable
+            headers={['Type', 'Cross-region?', 'Monetization?', 'Compute Billed To']}
+            rows={[
+              ['Direct Share', 'NO (same region)', 'NO', 'Consumer'],
+              ['Listing (Marketplace public)', 'YES (auto-fulfillment)', 'YES (paid listings)', 'Consumer'],
+              ['Listing (private)', 'YES', 'YES (or free)', 'Consumer'],
+              ['Reader Account', 'Same as direct share (region-bound)', 'NO', 'PROVIDER'],
+              ['Native App', 'YES (via Marketplace)', 'YES', 'Consumer'],
+              ['Data Clean Room', 'YES (Marketplace deployment)', 'YES', 'Both contribute compute'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="What CAN and CANNOT Be Shared — Full List">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p className="font-bold text-green-700">CAN share:</p>
+            <p>✓ Tables (permanent, external, Iceberg)</p>
+            <p>✓ Secure views</p>
+            <p>✓ Secure UDFs (SECURE keyword)</p>
+            <p>✓ Secure materialized views</p>
+            <p>✓ Dynamic tables</p>
+            <p className="font-bold text-red-700 mt-2">CANNOT share:</p>
+            <p>✗ Standard (non-secure) views</p>
+            <p>✗ Standard UDFs / regular UDFs</p>
+            <p>✗ Stored procedures</p>
+            <p>✗ Stages (internal or external)</p>
+            <p>✗ Sequences</p>
+            <p>✗ File formats</p>
+            <p>✗ Pipes, Tasks, Streams</p>
+            <p>✗ Warehouses (consumer brings own)</p>
+            <p>✗ Roles, users (separate replication)</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Consumer Restrictions — Direct Shares">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs space-y-1">
+            <p className="font-bold text-red-700">Consumer of a Direct Share CANNOT:</p>
+            <p>✗ INSERT/UPDATE/DELETE/MERGE on shared objects (read-only)</p>
+            <p>✗ CLONE shared objects (no OWNERSHIP)</p>
+            <p>✗ Run Time Travel queries on shared data</p>
+            <p>✗ Add masking/row access policies (provider controls)</p>
+            <p>✗ Replicate the shared database to another region (must be re-shared)</p>
+            <p>✗ See dropped objects (revocation is immediate)</p>
+            <p>✗ Re-share with another account (no re-sharing of received shares)</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Reader Accounts — Cannot-Do Matrix">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs space-y-1">
+            <p className="font-bold text-red-700">Reader Account CANNOT:</p>
+            <p>✗ CREATE SHARE (no outbound sharing)</p>
+            <p>✗ CREATE PIPE (no Snowpipe automation)</p>
+            <p>✗ CREATE STAGE (named stages restricted)</p>
+            <p>✗ Access Snowflake Marketplace</p>
+            <p>✗ SHOW PROCEDURES on certain system schemas</p>
+            <p>✗ Be replicated (must be recreated post-failover)</p>
+            <p>✗ Use Reader Accounts for compute beyond what provider pays</p>
+            <p className="font-bold text-green-700 mt-2">Reader Account CAN:</p>
+            <p>✓ Create warehouses (provider pays)</p>
+            <p>✓ Create databases, schemas, tables, views</p>
+            <p>✓ Run queries against shared data</p>
+            <p>✓ Have its own users and roles within the account</p>
+          </div>
+        </Accordion>
+
         <Traps list={[
           '"Direct shares work cross-region" = FALSE — same region only; use Listings for cross-region',
           '"Standard views can be shared" = FALSE — only SECURE views',
@@ -1412,6 +2642,9 @@ const D5_SECTIONS = [
           '"Reader Accounts cannot create any objects" = FALSE — can create DBs, tables, etc.',
           '"Any role can create a share" = FALSE — requires ACCOUNTADMIN or CREATE SHARE privilege',
           '"Reader Account limit is 100 per account" = FALSE — default limit is 20',
+          '"Consumer can re-share received data with another account" = FALSE — no re-sharing of received shares',
+          '"Reader Accounts can be replicated" = FALSE — must be recreated post-failover',
+          '"Stored procedures and standard UDFs can be shared" = FALSE — only SECURE UDFs',
         ]} />
       </div>
     ),
@@ -1467,7 +2700,7 @@ const D5_SECTIONS = [
           <CodeSnip>{`-- Show full data only to paying consumers; redact otherwise\nCREATE SECURE VIEW premium_data AS\nSELECT\n  customer_id,\n  CASE WHEN SYSTEM$IS_LISTING_PURCHASED('LISTING_ID')\n    THEN sensitive_value\n    ELSE NULL\n  END AS sensitive_value\nFROM raw_data;`}</CodeSnip>
         </Accordion>
 
-        <Accordion title="Numbers to Memorize" badge="Cheat Sheet" badgeColor="bg-rose-100 text-rose-700">
+        <Accordion title="Numbers to Memorize — Master Cheat Sheet" badge="Cheat Sheet" badgeColor="bg-rose-100 text-rose-700">
           <CompareTable
             headers={['Concept', 'Value']}
             rows={[
@@ -1476,23 +2709,149 @@ const D5_SECTIONS = [
               ['Time Travel max (Standard)', '1 day'],
               ['Time Travel max (Enterprise+, permanent)', '90 days'],
               ['Time Travel max (transient/temporary, all editions)', '1 day'],
+              ['DATA_RETENTION default', '1 day (DB → schema → table inheritance)'],
               ['DATA_RETENTION = 0', 'Disables Time Travel; UNDROP fails'],
               ['MAX_DATA_EXTENSION_TIME default', '14 days'],
               ['COPY metadata retention', '64 days'],
               ['Snowpipe metadata retention', '14 days'],
+              ['Snowpipe insertFiles batch limit', '5000 files per call'],
+              ['Snowpipe latency target', '~1 minute'],
               ['Optimal load file size', '100–250 MB compressed'],
+              ['Micro-partition size', '50–500 MB uncompressed (~16 MB compressed)'],
               ['Multi-cluster WH max clusters', '10'],
               ['Multi-cluster ECONOMY wait time', '6 minutes before adding cluster'],
-              ['Result cache TTL (per reuse)', '24 hours; max 31 days if continuously reused'],
+              ['MAX_CLUSTER_COUNT default', '1 (single cluster)'],
+              ['MIN_CLUSTER_COUNT default', '1'],
+              ['SCALING_POLICY default', 'STANDARD'],
+              ['AUTO_SUSPEND default', '600 s (10 min)'],
+              ['AUTO_SUSPEND = 0', 'NEVER suspend (not "immediate")'],
+              ['AUTO_RESUME default', 'TRUE'],
+              ['Per-resume billing minimum', '60 seconds'],
+              ['QAS_MAX_SCALE_FACTOR default / max', '8 / 100'],
+              ['Result cache TTL (per reuse)', '24 hours'],
+              ['Result cache hard max', '31 days if continuously reused'],
               ['STATEMENT_TIMEOUT_IN_SECONDS default', '172800 s (2 days)'],
+              ['STATEMENT_QUEUED_TIMEOUT_IN_SECONDS default', '0 (no timeout)'],
+              ['LOCK_TIMEOUT default', '43200 s (12 hours)'],
+              ['Session idle timeout default', '4 hours'],
+              ['CLIENT_SESSION_KEEP_ALIVE default', 'FALSE'],
+              ['ABORT_DETACHED_QUERY default', 'FALSE'],
+              ['USE_CACHED_RESULT default', 'TRUE'],
+              ['ERROR_ON_NONDETERMINISTIC_MERGE default', 'TRUE'],
+              ['Identifier max length', '255 characters'],
+              ['QUERY_TAG max length', '2000 characters'],
+              ['SQL statement max length', '1,000,000 characters'],
+              ['Tag keys per object max', '50'],
+              ['Tag value length max', '256 characters'],
+              ['Masking policies per column', '1'],
+              ['Row access policies per table', '1'],
               ['Reader Account limit per provider', '20 accounts'],
               ['Clustering recommended for tables', '> ~1 TB'],
               ['Direct Share scope', 'Same region only'],
               ['Listing scope', 'Cross-region (Auto-Fulfillment)'],
               ['Reader Account compute billing', 'Provider pays'],
               ['Replicated DB access', 'Read-only (until failover)'],
+              ['Failover requires edition', 'Business Critical+ on both source AND target'],
+              ['PrivateLink edition', 'Business Critical+'],
               ['Task minimum schedule (warehouse)', '1 minute'],
+              ['Task minimum schedule (serverless)', '~10 seconds'],
+              ['USER_TASK_TIMEOUT_MS default', '3,600,000 ms (1 hour)'],
+              ['Task DAG max depth', '1000 tasks'],
+              ['Dynamic Table min TARGET_LAG', '1 minute'],
+              ['Stream stale threshold', 'Source retention + extension cap (default 14 days)'],
+              ['Resource Monitor default frequency', 'MONTHLY'],
+              ['Resource Monitor CREATE privilege', 'ACCOUNTADMIN only'],
+              ['Resource Monitor min privileges to view+modify', 'MONITOR + MODIFY'],
+              ['ACCOUNT_USAGE retention', '365 days (typical)'],
+              ['ACCOUNT_USAGE latency', '45 min – 3 hours'],
+              ['INFORMATION_SCHEMA retention', '7–14 days'],
+              ['Default password min length', '8 characters'],
+              ['Key-pair max keys per user', '2 (for rotation)'],
+              ['Min key size', '2048-bit RSA'],
+              ['Network policy precedence', 'BLOCKED > ALLOWED; user > account'],
+              ['Encryption at rest', 'AES-256 (all editions)'],
+              ['Tri-Secret Secure', 'Business Critical+'],
               ['Consumer Time Travel on shared data', 'NOT available'],
+              ['Snowpark languages', 'Python, Java, Scala (NOT JavaScript)'],
+              ['JavaScript UDF', 'Via raw SQL only (NOT Snowpark API)'],
+              ['VARIANT path syntax', 'data:key (colon required at root); GET_PATH() alternative'],
+              ['DDL within transaction', 'Auto-commits any open transaction'],
+              ['DEFAULT_ROLE', 'Does NOT grant role; only sets default'],
+              ['DEFAULT_WAREHOUSE', 'Does NOT grant USAGE; only sets default'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Listing Type Variations" badge="Memorize" badgeColor="bg-amber-100 text-amber-700">
+          <CompareTable
+            headers={['Listing Type', 'Discoverability', 'Monetization', 'Notes']}
+            rows={[
+              ['Public free', 'Anyone can discover via Marketplace search', 'NO', 'Default for community/promotional data'],
+              ['Public paid', 'Anyone can discover; payment required to access', 'YES', 'Subscription or one-time'],
+              ['Private', 'Visible only to specifically invited accounts', 'Optional', 'For B2B / partner sharing'],
+              ['Personalized', 'Customized data per consumer', 'Typically YES', 'Newer feature; per-consumer instance'],
+              ['Free vs Free Trial', 'Free always; Free Trial converts to paid after period', 'Free Trial supports paid conversion', 'Different from Public free'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Marketplace — Defaults & Limits">
+          <CompareTable
+            headers={['Item', 'Default / Limit', 'Notes']}
+            rows={[
+              ['Provider role', 'ACCOUNTADMIN required to create listings', 'Plus PROVIDER profile setup'],
+              ['Provider profile', 'One per account', 'Shows on Marketplace listings'],
+              ['Auto-Fulfillment (cross-cloud)', 'Provider opts in per listing', 'Snowflake handles cross-region replication'],
+              ['Listing approval', 'Snowflake review required for public listings', 'Private listings skip review'],
+              ['Listing region', 'Listing must be available in regions where consumer is', 'Auto-Fulfillment expands availability'],
+              ['Pricing models', 'Free, Paid (one-time), Paid (subscription)', 'Currency = USD typically'],
+              ['Trial period', 'Provider configurable', '30 days common'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Native Apps — Defaults & Architecture">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>App package = code (SQL, Python, Streamlit) + version</p>
+            <p>Provider creates an APPLICATION PACKAGE → adds versions → publishes via Listing</p>
+            <p>Consumer installs APPLICATION from Listing → app runs in consumer\'s account</p>
+            <p>Consumer\'s compute (warehouse) is used; provider does NOT pay for compute</p>
+            <p>App can request privileges from consumer (e.g., access to consumer tables)</p>
+            <p>Application roles: APP_ADMIN (admin tasks), APP_PUBLIC (default user role)</p>
+            <p className="text-red-700 mt-2">Provider code is opaque to consumer (provider IP protected); consumer data is opaque to provider</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Data Clean Rooms — Workflow Detail">
+          <CompareTable
+            headers={['Step', 'Provider', 'Consumer']}
+            rows={[
+              ['1. Create clean room', 'YES (publishes via Listing)', '—'],
+              ['2. Define templates', 'YES (allowed analyses + privacy rules)', '—'],
+              ['3. Install / join', '—', 'YES'],
+              ['4. Link own data', 'YES (provider data)', 'YES (consumer data)'],
+              ['5. Run analysis', '—', 'YES (using approved templates only)'],
+              ['6. View results', '—', 'YES (aggregated/permitted output)'],
+              ['7. Manage policies', 'YES (privacy budget, k-anonymity)', '—'],
+            ]}
+          />
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-2 text-xs">
+            <p className="font-bold text-amber-700">Privacy guarantee</p>
+            <p className="text-slate-700 mt-1">Both parties contribute data; neither sees the other\'s raw rows. Output is the controlled result of the approved template (typically aggregated).</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Marketplace Cannot-Do Matrix" badge="5-Point Audit" badgeColor="bg-purple-100 text-purple-700">
+          <CompareTable
+            headers={['Capability', 'Cannot Do']}
+            rows={[
+              ['Listing payment', 'Cannot mix payment models (one model per listing)'],
+              ['Listing visibility', 'Cannot make a listing both Public and Private (different listings required)'],
+              ['Listing data', 'Cannot include non-shareable objects (procedures, standard UDFs, stages)'],
+              ['Native App', 'Cannot run on provider compute; cannot access consumer data without explicit grants'],
+              ['Personalized listing', 'Cannot serve same physical data to all consumers — per-consumer instance'],
+              ['Auto-Fulfillment', 'Cannot work without provider opt-in per listing'],
+              ['Clean Room', 'Cannot allow consumer to see provider\'s raw rows (and vice versa)'],
             ]}
           />
         </Accordion>
@@ -1502,6 +2861,10 @@ const D5_SECTIONS = [
           '"Direct shares support monetization" = FALSE — use Listings',
           '"Listings are only public" = FALSE — private listings exist for specific accounts',
           '"Native Apps run on the provider\'s compute" = FALSE — consumer\'s compute',
+          '"Auto-Fulfillment is automatic for all listings" = FALSE — provider must opt in',
+          '"Clean Room consumers see raw provider rows" = FALSE — only approved aggregated outputs',
+          '"Personalized listings serve identical data to all consumers" = FALSE — per-consumer instance',
+          '"Free Trial listings stay free forever" = FALSE — convert to paid after trial',
         ]} />
       </div>
     ),
