@@ -1,0 +1,616 @@
+[
+  {
+    "id": 1,
+    "domain": "D1: Architecture",
+    "objective": "1.2",
+    "question": "What criteria does Snowflake use to determine the current role when initiating a session? (Select TWO)",
+    "options": {
+      "A": "If a role was specified as part of the connection and that role has been granted to the Snowflake user, the specified role becomes the current role.",
+      "B": "If no role was specified as part of the connection and a default role has been defined for the Snowflake user, that role becomes the current role.",
+      "C": "If no role was specified as part of the connection and a default role has not been set for the Snowflake user, the session will not be initiated and the log in will fail.",
+      "D": "If a role was specified as part of the connection and that role has not been granted to the Snowflake user, it will be ignored and the default role will become the current role.",
+      "E": "If a role was specified as part of the connection and that role has not been granted to the Snowflake user, the role is automatically granted, and it becomes the current role."
+    },
+    "correct": ["A", "B"],
+    "explanation": "When connecting, if a role is specified AND granted to the user, it becomes current. If no role is specified, the user's default role is used. If no default exists, PUBLIC is used (login does NOT fail). If a specified role is NOT granted, Snowflake falls back to the default role (not D's wording - D says 'ignored' which is partially right but the official behavior uses default role OR PUBLIC).",
+    "multi_select": true
+  },
+  {
+    "id": 2,
+    "domain": "D3: Loading",
+    "objective": "3.1",
+    "question": "A team receives 5 TB of raw CSV log data every day via Snowpipe from S3. Large files cause slow loads, errors fail entire jobs, and debugging is hard. Which action will optimize the ingestion process?",
+    "options": {
+      "A": "Process all 5 TB of data using COPY INTO.",
+      "B": "Break the large file into smaller files.",
+      "C": "Process data continuously as it arrives.",
+      "D": "Use micro-batching for bulk processing with streaming for real-time data."
+    },
+    "correct": ["B"],
+    "explanation": "Snowflake recommends splitting large files into smaller files (100-250 MB compressed) for Snowpipe. This enables parallel loading, isolates errors to individual files, and makes debugging easier.",
+    "multi_select": false
+  },
+  {
+    "id": 3,
+    "domain": "D1: Architecture",
+    "objective": "1.3",
+    "question": "What is a key consideration when using a Snowflake materialized view?",
+    "options": {
+      "A": "A materialized view only supports inner joins between component tables.",
+      "B": "A materialized view must have the same clustering key as one of the component tables.",
+      "C": "A materialized view can only be used when the background service has had time to update after DML operations.",
+      "D": "A materialized view may become invalid if the underlying base table columns have been dropped."
+    },
+    "correct": ["D"],
+    "explanation": "A materialized view becomes invalid if the base table columns it references are dropped. MVs don't support joins at all (not just inner joins). They don't require matching clustering keys. MVs can still be queried before the background service updates - Snowflake handles staleness transparently.",
+    "multi_select": false
+  },
+  {
+    "id": 4,
+    "domain": "D5: Sharing",
+    "objective": "5.2",
+    "question": "Which tasks correspond to the provider when two organizations want to work in collaboration and review data using a Data Clean Room? (Select TWO)",
+    "options": {
+      "A": "Join data in the target account",
+      "B": "Install the clean room",
+      "C": "Analyze data",
+      "D": "Add data to a clean room",
+      "E": "Create the clean room"
+    },
+    "correct": ["D", "E"],
+    "explanation": "Providers create the clean room and add (link) data to it. Consumers install (join) the clean room, link their own data, and run analyses. Installing and analyzing are consumer tasks.",
+    "multi_select": true
+  },
+  {
+    "id": 5,
+    "domain": "D3: Loading",
+    "objective": "3.1",
+    "question": "A user needs to upload sales.csv from their local machine into their personal default stage inside a folder named current_data. Which command should the user run?",
+    "options": {
+      "A": "PUT file:///sales.csv @current_data",
+      "B": "PUT file:///sales.csv @~/current_data",
+      "C": "PUT file:///sales.csv #%current_data",
+      "D": "PUT 'file:///sales.csv' @current_data"
+    },
+    "correct": ["B"],
+    "explanation": "The user stage is referenced with @~ (tilde). To place files in a subfolder within the user stage, use @~/folder_name. Option A references a named stage called 'current_data'. Option C uses invalid syntax. Option D also references a named stage.",
+    "multi_select": false
+  },
+  {
+    "id": 6,
+    "domain": "D4: Performance",
+    "objective": "1.4",
+    "question": "What are the recommended steps to address poor SQL query performance due to data spilling? (Select TWO)",
+    "options": {
+      "A": "Clone the base table.",
+      "B": "Fetch required attributes only.",
+      "C": "Use a larger virtual warehouse.",
+      "D": "Process the data in smaller batches.",
+      "E": "Add another cluster in the virtual warehouse."
+    },
+    "correct": ["B", "C"],
+    "explanation": "Spilling occurs when a warehouse doesn't have enough memory. Solutions: (1) Use a larger warehouse (more memory/resources), (2) Reduce data processed by selecting only required columns. Cloning doesn't help. Multi-cluster addresses concurrency not memory per query. Smaller batches aren't a standard Snowflake recommendation for spilling.",
+    "multi_select": true
+  },
+  {
+    "id": 7,
+    "domain": "D1: Architecture",
+    "objective": "1.3",
+    "question": "Why is the PRIMARY KEY constraint used on standard tables?",
+    "options": {
+      "A": "To encrypt data in the table and ensure security",
+      "B": "To cluster data in the table and improve performance",
+      "C": "To enforce data integrity by preventing duplicate values",
+      "D": "To indicate unique identifiers for metadata purposes"
+    },
+    "correct": ["D"],
+    "explanation": "In Snowflake, PRIMARY KEY constraints are NOT enforced - they are informational/metadata only. They document intent and help tools understand the data model but do not prevent duplicates or enforce integrity.",
+    "multi_select": false
+  },
+  {
+    "id": 8,
+    "domain": "D5: Sharing",
+    "objective": "5.2",
+    "question": "Which database objects can be shared with Secure Data Sharing? (Select TWO)",
+    "options": {
+      "A": "Views",
+      "B": "Materialized views",
+      "C": "External stages",
+      "D": "External tables",
+      "E": "Dynamic tables"
+    },
+    "correct": ["D", "E"],
+    "explanation": "Objects that can be shared include: tables, external tables, dynamic tables, secure views, secure materialized views, and secure UDFs. Regular (non-secure) views and materialized views cannot be shared - only SECURE views/MVs can. External stages cannot be shared. Since option A says 'Views' (not secure views) and B says 'Materialized views' (not secure MVs), D and E are correct.",
+    "multi_select": true
+  },
+  {
+    "id": 9,
+    "domain": "D3: Loading",
+    "objective": "3.1",
+    "question": "COPY INTO <table> is loading staged JSON data but it all goes into a single row. What FILE_FORMAT parameter will load the data into separate table rows?",
+    "options": {
+      "A": "PARSE_HEADER",
+      "B": "STRIP_OUTER_ARRAY",
+      "C": "FIELD_OPTIONALLY_ENCLOSED_BY",
+      "D": "STRIP_OUTER_ELEMENT"
+    },
+    "correct": ["B"],
+    "explanation": "When JSON data is wrapped in an outer array [...], COPY INTO loads the entire array as one row. STRIP_OUTER_ARRAY = TRUE removes the outer array brackets and loads each element as a separate row.",
+    "multi_select": false
+  },
+  {
+    "id": 10,
+    "domain": "D2: Security",
+    "objective": "2.1",
+    "question": "When creating an external stage for Amazon S3, which is the primary security benefit of using a STORAGE INTEGRATION object compared to embedding credentials directly?",
+    "options": {
+      "A": "It grants temporary, revocable permissions to unload data to the external bucket, in addition to read access.",
+      "B": "It automatically encrypts the data files in the external bucket using Snowflake keys before loading.",
+      "C": "It allows Snowflake to deploy and version-control stored procedures from a private Git repository stored in Amazon S3.",
+      "D": "It avoids the need to store hard-coded credentials in the stage definition."
+    },
+    "correct": ["D"],
+    "explanation": "The primary security benefit of a storage integration is that it avoids storing hard-coded credentials (AWS keys) in the stage definition. Instead it uses IAM roles and trust relationships.",
+    "multi_select": false
+  },
+  {
+    "id": 11,
+    "domain": "D4: Performance",
+    "objective": "1.4",
+    "question": "Which factors indicate that a table may benefit from clustering? (Select TWO)",
+    "options": {
+      "A": "The table is 1 TB or larger.",
+      "B": "The table is an external table.",
+      "C": "The response time is greater than 10 seconds.",
+      "D": "The table is queried with many different filters on different columns.",
+      "E": "A large number of micro-partitions are scanned but just a subset of data is retrieved."
+    },
+    "correct": ["A", "E"],
+    "explanation": "Clustering benefits: (1) Large tables (multi-TB), typically 1 TB+ where natural ordering has degraded. (2) Poor partition pruning - scanning many partitions but returning few rows. External tables can't be clustered. Response time alone isn't an indicator. Many different filter columns makes choosing a single clustering key difficult.",
+    "multi_select": true
+  },
+  {
+    "id": 12,
+    "domain": "D2: Security",
+    "objective": "2.3",
+    "question": "How can the ACCESS_HISTORY view in ACCOUNT_USAGE be used to review data governance? (Select TWO)",
+    "options": {
+      "A": "Identify queries run by a particular user.",
+      "B": "Identify access to the roles given to a user.",
+      "C": "Identify SQL statements that failed to run.",
+      "D": "Identify objects that were modified by a query.",
+      "E": "Identify object dependencies."
+    },
+    "correct": ["A", "D"],
+    "explanation": "ACCESS_HISTORY tracks which users accessed/modified which objects. It shows: (A) queries by user via USER_NAME column, (D) objects modified via OBJECTS_MODIFIED column. It doesn't track role grants (B), failed statements (C - that's QUERY_HISTORY), or object dependencies (E - that's OBJECT_DEPENDENCIES).",
+    "multi_select": true
+  },
+  {
+    "id": 13,
+    "domain": "D4: Performance",
+    "objective": "1.4",
+    "question": "If a table has a clustering key defined, which DML operations will trigger re-clustering? (Select TWO)",
+    "options": {
+      "A": "SELECT",
+      "B": "MERGE",
+      "C": "COPY",
+      "D": "SHOW",
+      "E": "DESCRIBE"
+    },
+    "correct": ["B", "C"],
+    "explanation": "Re-clustering is triggered by DML that modifies data (inserts/updates/deletes). MERGE modifies data. COPY INTO loads data (inserts). SELECT, SHOW, and DESCRIBE are read-only operations that don't modify table data.",
+    "multi_select": true
+  },
+  {
+    "id": 14,
+    "domain": "D4: Performance",
+    "objective": "1.4",
+    "question": "Based on a Query Profile, which scenarios will benefit MOST from a clustering key? (Select TWO)",
+    "options": {
+      "A": "A column that appears most frequently in ORDER BY operations",
+      "B": "A column that appears most frequently in WHERE operations",
+      "C": "A column that appears most frequently in GROUP BY operations",
+      "D": "A column that appears most frequently in AGGREGATE operations",
+      "E": "A column that appears most frequently in JOIN operations"
+    },
+    "correct": ["B", "E"],
+    "explanation": "Clustering keys improve partition pruning. WHERE clauses and JOIN predicates benefit most because they filter data before processing, allowing Snowflake to skip irrelevant micro-partitions. ORDER BY, GROUP BY, and AGGREGATE operations happen after data is read.",
+    "multi_select": true
+  },
+  {
+    "id": 15,
+    "domain": "D2: Security",
+    "objective": "2.1",
+    "question": "A user wants to add additional privileges to system-defined roles for their virtual warehouse. How does Snowflake recommend they accomplish this?",
+    "options": {
+      "A": "Grant the additional privileges to a custom role.",
+      "B": "Grant the additional privileges to the ACCOUNTADMIN role.",
+      "C": "Grant the additional privileges to the SYSADMIN role.",
+      "D": "Grant the additional privileges to the ORGADMIN role."
+    },
+    "correct": ["A"],
+    "explanation": "Snowflake best practice: never modify system-defined roles. Create custom roles for specific privileges and grant those custom roles to system roles in the hierarchy. This preserves the RBAC model and allows granular control.",
+    "multi_select": false
+  },
+  {
+    "id": 16,
+    "domain": "D4: Performance",
+    "objective": "1.4",
+    "question": "What type of columns does Snowflake recommend be used as clustering keys? (Select TWO)",
+    "options": {
+      "A": "A VARIANT column",
+      "B": "A column with very low cardinality",
+      "C": "A column with very high cardinality",
+      "D": "A column that is most actively used in selective filters",
+      "E": "A column that is most actively used in join predicates"
+    },
+    "correct": ["D", "E"],
+    "explanation": "Snowflake recommends columns used in WHERE clauses (selective filters) and JOIN predicates as clustering keys. Very low cardinality provides limited pruning benefit. Very high cardinality (like UUID) is also not ideal. VARIANT columns are not recommended as clustering keys directly.",
+    "multi_select": true
+  },
+  {
+    "id": 17,
+    "domain": "D1: Architecture",
+    "objective": "1.2",
+    "question": "What are the capabilities of Snowflake SQL API? (Select TWO)",
+    "options": {
+      "A": "Requires installing a language-specific driver",
+      "B": "Returns responses in JSON",
+      "C": "Supports OAuth for authentication",
+      "D": "Can call third-party REST APIs during SQL execution",
+      "E": "Can support GET and PUT commands"
+    },
+    "correct": ["B", "C"],
+    "explanation": "The Snowflake SQL API is a REST API that: returns responses in JSON format, supports OAuth and key-pair authentication. It does NOT require language-specific drivers (that's the point - it's HTTP-based). It cannot call third-party APIs during execution. It does NOT support GET/PUT commands.",
+    "multi_select": true
+  },
+  {
+    "id": 18,
+    "domain": "D5: Sharing",
+    "objective": "5.3",
+    "question": "Which system function can manage access to data in a share and display certain data only to paying customers?",
+    "options": {
+      "A": "SYSTEM$ALLOWLIST",
+      "B": "SYSTEM$ALLOWLIST_PRIVATELINK",
+      "C": "SYSTEM$AUTHORIZE_PRIVATELINK",
+      "D": "SYSTEM$_LISTING_PURCHASED"
+    },
+    "correct": ["D"],
+    "explanation": "SYSTEM$IS_LISTING_PURCHASED() is the correct function name (validated via SQL). It's used inside secure views/UDFs to check if a consumer has purchased a Marketplace listing, enabling providers to gate data access to paying customers only. The exam option uses SYSTEM$_LISTING_PURCHASED which is the intended answer.",
+    "multi_select": false
+  },
+  {
+    "id": 19,
+    "domain": "D3: Loading",
+    "objective": "3.1",
+    "question": "A user needs to convert relational table rows to a VARIANT column and unload into a file. Which function should be used in the COPY command?",
+    "options": {
+      "A": "TO_VARIANT",
+      "B": "PARSE_JSON",
+      "C": "CHECK_JSON",
+      "D": "OBJECT_CONSTRUCT"
+    },
+    "correct": ["D"],
+    "explanation": "OBJECT_CONSTRUCT converts relational columns into a single VARIANT/OBJECT by taking column-name/value pairs. This is ideal for unloading relational data as JSON. TO_VARIANT converts a single value. PARSE_JSON parses a string. CHECK_JSON validates JSON.",
+    "multi_select": false
+  },
+  {
+    "id": 20,
+    "domain": "D1: Architecture",
+    "objective": "1.3",
+    "question": "If a source table is updated while cloning is in progress, what data will be included in the cloned table?",
+    "options": {
+      "A": "All data from the timestamp when the user runs the query.",
+      "B": "All data from the timestamp when the user session was created.",
+      "C": "All data from the timestamp when the clone statement was initiated.",
+      "D": "All data from the timestamp when the clone statement was completed."
+    },
+    "correct": ["C"],
+    "explanation": "Cloning uses the snapshot of data at the time the CREATE ... CLONE statement is initiated. Any changes made to the source table after the statement begins are not included in the clone.",
+    "multi_select": false
+  },
+  {
+    "id": 21,
+    "domain": "D4: Performance",
+    "objective": "1.4",
+    "question": "Which attributes in a Query Profile would a user examine to determine if bad pruning is an issue? (Select TWO)",
+    "options": {
+      "A": "Scan progress",
+      "B": "Number of rows unloaded",
+      "C": "Partitions total",
+      "D": "Partitions scanned",
+      "E": "Percentage scanned from cache"
+    },
+    "correct": ["C", "D"],
+    "explanation": "To identify bad pruning, compare 'Partitions scanned' vs 'Partitions total'. If scanned is close to total, pruning is ineffective. Scan progress shows how far along a scan is. Rows unloaded is for COPY INTO unload. Cache percentage relates to warehouse cache.",
+    "multi_select": true
+  },
+  {
+    "id": 22,
+    "domain": "D2: Security",
+    "objective": "2.1",
+    "question": "What does a masking policy consist of in Snowflake?",
+    "options": {
+      "A": "A single data type, with one or more conditions, and one or more masking functions",
+      "B": "A single data type, with only one condition, and only one masking function",
+      "C": "Multiple data types, with only one condition, and one or more masking functions",
+      "D": "Multiple data types, with one or more conditions, and one or more masking functions"
+    },
+    "correct": ["A"],
+    "explanation": "A masking policy is defined on a single data type (the input and output must match), but can contain multiple conditions (CASE/WHEN) and apply different masking functions based on those conditions.",
+    "multi_select": false
+  },
+  {
+    "id": 23,
+    "domain": "D3: Loading",
+    "objective": "3.1",
+    "question": "Which function can be used to convert semi-structured data into a relational representation?",
+    "options": {
+      "A": "FLATTEN",
+      "B": "OBJECT_KEYS",
+      "C": "PARSE_JSON",
+      "D": "ARRAYS_TO_OBJECT"
+    },
+    "correct": ["A"],
+    "explanation": "FLATTEN explodes semi-structured data (arrays, objects) into a relational (tabular) format with rows. OBJECT_KEYS returns keys of an object. PARSE_JSON converts a string to VARIANT. ARRAYS_TO_OBJECT creates an object from key-value arrays.",
+    "multi_select": false
+  },
+  {
+    "id": 24,
+    "domain": "D1: Architecture",
+    "objective": "1.2",
+    "question": "A complex query has been running in Snowsight for more than one hour while other queries succeed. What is the FASTEST way to cancel the long-running query?",
+    "options": {
+      "A": "Immediately suspend the virtual warehouse that the query is running on.",
+      "B": "Return to the worksheet and abort the query.",
+      "C": "Set the auto_suspend virtual warehouse property to 0.",
+      "D": "Find the query in the query activity view and cancel the query."
+    },
+    "correct": ["B"],
+    "explanation": "The fastest way is to return to the worksheet where the query is running and click the abort/cancel button. Suspending the warehouse would cancel ALL queries running on it (affecting others). The activity view works but requires more navigation steps.",
+    "multi_select": false
+  },
+  {
+    "id": 25,
+    "domain": "D1: Architecture",
+    "objective": "1.2",
+    "question": "What is the impact of selecting one Snowflake edition over another? (Select TWO)",
+    "options": {
+      "A": "The edition will impact the unit costs for storage.",
+      "B": "The edition will impact which regions can be accessed by the accounts.",
+      "C": "The edition will determine the unit costs for the compute credits.",
+      "D": "The edition will impact the total allowed storage space.",
+      "E": "The edition will set a limit on the number of compute credits that can be consumed."
+    },
+    "correct": ["A", "C"],
+    "explanation": "Snowflake editions impact pricing: higher editions have higher per-credit costs and higher storage costs. Editions don't limit regions (B), don't cap storage space (D), and don't limit credit consumption (E).",
+    "multi_select": true
+  },
+  {
+    "id": 26,
+    "domain": "D3: Loading",
+    "objective": "3.1",
+    "question": "A user needs to ingest 1 GB of data from an external stage using COPY INTO. How can this be done with MAXIMUM performance and LEAST cost?",
+    "options": {
+      "A": "Ingest the data in a compressed format as a single file.",
+      "B": "Ingest the data in an uncompressed format as a single file.",
+      "C": "Split the file into smaller files of 100-250 MB each, compress and ingest each of the smaller files.",
+      "D": "Split the file into smaller files of 100-250 MB each and ingest each of the smaller files in an uncompressed format."
+    },
+    "correct": ["C"],
+    "explanation": "Snowflake best practice: split files into 100-250 MB compressed chunks. This enables parallel loading across warehouse nodes AND compression reduces data transfer/storage costs. A single file (compressed or not) can't leverage parallelism.",
+    "multi_select": false
+  },
+  {
+    "id": 27,
+    "domain": "D2: Security",
+    "objective": "2.1",
+    "question": "Which order of object privileges should be used to grant a custom role read-only access on a table?",
+    "options": {
+      "A": "1.Schema USAGE → 2.Database USAGE → 3.Table USAGE",
+      "B": "1.Schema USAGE → 2.Database USAGE → 3.Table SELECT",
+      "C": "1.Database USAGE → 2.Schema USAGE → 3.Table SELECT",
+      "D": "1.Database USAGE → 2.Schema USAGE → 3.Table OPERATE"
+    },
+    "correct": ["C"],
+    "explanation": "The correct hierarchy for read-only access: USAGE on Database → USAGE on Schema → SELECT on Table. The order matters: you need database access first, then schema, then the table privilege. SELECT (not USAGE or OPERATE) provides read access to tables.",
+    "multi_select": false
+  },
+  {
+    "id": 28,
+    "domain": "D1: Architecture",
+    "objective": "1.3",
+    "question": "Which operations can be performed on Snowflake external tables? (Select TWO)",
+    "options": {
+      "A": "INSERT",
+      "B": "JOIN",
+      "C": "RENAME",
+      "D": "DELETE FROM",
+      "E": "ALTER"
+    },
+    "correct": ["B", "E"],
+    "explanation": "External tables are read-only so you cannot INSERT or DELETE. You CAN: JOIN them with other tables in queries, and ALTER them (e.g., refresh, add/remove columns). RENAME is not a standard operation on external tables.",
+    "multi_select": true
+  },
+  {
+    "id": 29,
+    "domain": "D4: Performance",
+    "objective": "1.4",
+    "question": "Where does Snowflake store the data output from a query executed in the past 24 hours?",
+    "options": {
+      "A": "In a micro-partition",
+      "B": "In a remote disk",
+      "C": "In the result cache",
+      "D": "In the local disk cache"
+    },
+    "correct": ["C"],
+    "explanation": "Query results are stored in the result cache (also called query result cache or persisted query results) for 24 hours. This is in the cloud services layer, not in micro-partitions, remote disk, or local warehouse cache.",
+    "multi_select": false
+  },
+  {
+    "id": 30,
+    "domain": "D1: Architecture",
+    "objective": "1.3",
+    "question": "How can a user determine when a stream will become stale?",
+    "options": {
+      "A": "By using the value of DATA_RETENTION_TIME_IN_DAYS",
+      "B": "By using the lesser value of DATA_RETENTION_TIME_IN_DAYS and MAX_DATA_EXTENSION_TIME_IN_DAYS",
+      "C": "By using the greater value of DATA_RETENTION_TIME_IN_DAYS and MAX_DATA_EXTENSION_TIME_IN_DAYS",
+      "D": "By using the sum of the values of DATA_RETENTION_TIME_IN_DAYS and MAX_DATA_EXTENSION_TIME_IN_DAYS"
+    },
+    "correct": ["C"],
+    "explanation": "Per Snowflake docs: The STALE_AFTER timestamp is calculated by adding the GREATER value of DATA_RETENTION_TIME_IN_DAYS or MAX_DATA_EXTENSION_TIME_IN_DAYS to the last consumption time of the stream.",
+    "multi_select": false
+  },
+  {
+    "id": 31,
+    "domain": "D2: Security",
+    "objective": "2.3",
+    "question": "What are the least privileges needed to view and modify resource monitors? (Select TWO)",
+    "options": {
+      "A": "SELECT",
+      "B": "OWNERSHIP",
+      "C": "MONITOR",
+      "D": "MODIFY",
+      "E": "USAGE"
+    },
+    "correct": ["C", "D"],
+    "explanation": "Per Snowflake docs: roles granted MONITOR privilege can view resource monitors, and roles granted MODIFY privilege can modify them. These are the minimum privileges needed (less than OWNERSHIP or ACCOUNTADMIN).",
+    "multi_select": true
+  },
+  {
+    "id": 32,
+    "domain": "D1: Architecture",
+    "objective": "1.6",
+    "question": "A Snowflake Practitioner is using Snowflake to run an ML model, but training is taking much longer than expected. Which step will accelerate the training?",
+    "options": {
+      "A": "Add additional clusters to the virtual warehouse.",
+      "B": "Use a Snowpark-optimized virtual warehouse.",
+      "C": "Use the search optimization service.",
+      "D": "Enable the query acceleration service."
+    },
+    "correct": ["B"],
+    "explanation": "Snowpark-optimized warehouses provide more memory per node, which is specifically designed for ML training workloads and memory-intensive operations. Multi-cluster addresses concurrency. Search optimization is for point lookups. QAS helps with queries that have large scans but selective results.",
+    "multi_select": false
+  },
+  {
+    "id": 33,
+    "domain": "D1: Architecture",
+    "objective": "1.6",
+    "question": "What computer language can be selected when creating UDFs using the Snowpark API?",
+    "options": {
+      "A": "Swift",
+      "B": "JavaScript",
+      "C": "Python",
+      "D": "SQL"
+    },
+    "correct": ["C"],
+    "explanation": "The Snowpark API supports Python, Java, and Scala for creating UDFs. While Snowflake supports JavaScript UDFs directly via SQL, the Snowpark API specifically uses Python, Java, or Scala. SQL UDFs are created via SQL not Snowpark API.",
+    "multi_select": false
+  },
+  {
+    "id": 34,
+    "domain": "D3: Loading",
+    "objective": "3.1",
+    "question": "When using COPY INTO <table> with Snowpipe, setting which parameter will provide additional record loading information?",
+    "options": {
+      "A": "SYSTIMESTAMP",
+      "B": "METADATA$START_SCAN_TIME",
+      "C": "LOCALTIMESTAMP",
+      "D": "CURRENT_TIMESTAMP"
+    },
+    "correct": ["B"],
+    "explanation": "METADATA$START_SCAN_TIME is a metadata column available during COPY INTO that provides the timestamp when Snowpipe started scanning the file. This gives additional loading information for tracking when records were ingested.",
+    "multi_select": false
+  },
+  {
+    "id": 35,
+    "domain": "D1: Architecture",
+    "objective": "1.2",
+    "question": "A user shares a worksheet (ANALYST role) with a Developer (DEVELOPER role only). Granting Edit with View = True permissions. What can the Developer do?",
+    "options": {
+      "A": "Run the worksheet.",
+      "B": "View the results of the most recent worksheet version.",
+      "C": "View the contents of the worksheet.",
+      "D": "Share the worksheet with other users."
+    },
+    "correct": ["C"],
+    "explanation": "With Edit + View permissions but without the ANALYST role, the Developer can view the worksheet contents (SQL code) but cannot run it (requires the role that owns the referenced objects). They cannot view prior results (role-dependent) or share it further without proper permissions.",
+    "multi_select": false
+  },
+  {
+    "id": 36,
+    "domain": "D2: Security",
+    "objective": "2.3",
+    "question": "How can a user MINIMIZE Continuous Data Protection costs when using large, high-churn dimension tables?",
+    "options": {
+      "A": "Create transient tables and periodically copy them to permanent tables.",
+      "B": "Create temporary tables and periodically copy them to permanent tables.",
+      "C": "Create regular tables with extended Time Travel and Fail-safe settings.",
+      "D": "Create regular tables with default Time Travel and Fail-safe settings."
+    },
+    "correct": ["A"],
+    "explanation": "Transient tables have no Fail-safe period (7 days of storage savings) and up to 1 day of Time Travel. For high-churn dimension tables, using transient tables minimizes CDP costs. Periodically copying to permanent tables provides a backup. Temporary tables only exist within a session. Extended settings increase costs.",
+    "multi_select": false
+  },
+  {
+    "id": 37,
+    "domain": "D4: Performance",
+    "objective": "1.4",
+    "question": "Which query can benefit from the result cache when data hasn't changed since last execution?",
+    "options": {
+      "A": "SELECT customer_id as ID FROM Customers WHERE city = 'Chicago';",
+      "B": "SELECT customer_id as ID FROM Customers WHERE state = ##state;",
+      "C": "SELECT UUID_STRING() as ID FROM Customers WHERE state = 'AZ';",
+      "D": "SELECT customer_id as ID FROM Customers WHERE tag = UUID_STRING();"
+    },
+    "correct": ["A"],
+    "explanation": "Result cache requires the exact same query text with no non-deterministic functions. Option A is fully deterministic with fixed values. B uses a variable (##state). C and D use UUID_STRING() which is non-deterministic, so results won't be cached.",
+    "multi_select": false
+  },
+  {
+    "id": 38,
+    "domain": "D2: Security",
+    "objective": "2.1",
+    "question": "Which is the MINIMUM Snowflake edition required to use Dynamic Data Masking?",
+    "options": {
+      "A": "Standard",
+      "B": "Enterprise",
+      "C": "Business Critical",
+      "D": "Virtual Private Snowflake (VPS)"
+    },
+    "correct": ["B"],
+    "explanation": "Dynamic Data Masking requires Enterprise Edition or higher. It is not available in Standard edition.",
+    "multi_select": false
+  },
+  {
+    "id": 39,
+    "domain": "D4: Performance",
+    "objective": "1.4",
+    "question": "Which use case is an example of an exploding join?",
+    "options": {
+      "A": "When a table is joined with itself and starts spilling",
+      "B": "When multiple tables are joined but records do not match",
+      "C": "When a table with a CTE is joined",
+      "D": "When multiple tables are joined without providing a join condition"
+    },
+    "correct": ["D"],
+    "explanation": "An exploding join (Cartesian product) occurs when tables are joined without a proper join condition, causing every row in one table to match every row in the other, producing an exponentially large result set.",
+    "multi_select": false
+  },
+  {
+    "id": 40,
+    "domain": "D1: Architecture",
+    "objective": "1.4",
+    "question": "A virtual warehouse was used for 5 minutes and 15 seconds and then shut down. How many seconds will the customer be charged for?",
+    "options": {
+      "A": "300 seconds",
+      "B": "315 seconds",
+      "C": "320 seconds",
+      "D": "360 seconds"
+    },
+    "correct": ["B"],
+    "explanation": "Snowflake billing: 60-second minimum when a warehouse starts, then per-second after that. The warehouse ran for 5 min 15 sec = 315 seconds continuously. Since it exceeded the 60-second minimum and billing is per-second thereafter, the charge is exactly 315 seconds. Per docs: 'If a warehouse runs for 61 seconds, it is billed for only 61 seconds.'",
+    "multi_select": false
+  }
+]

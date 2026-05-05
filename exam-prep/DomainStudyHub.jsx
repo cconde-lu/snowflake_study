@@ -140,10 +140,61 @@ const D1_SECTIONS = [
             ]}
           />
         </Accordion>
+
+        <Accordion title="SQL API — Full Capabilities">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>✓ Returns responses in <strong>JSON format</strong></p>
+            <p>✓ Supports <strong>OAuth or JWT (key-pair)</strong> authentication only</p>
+            <p>✓ Pure HTTP/REST — <strong>no language-specific driver required</strong></p>
+            <p className="text-red-700">✗ Does NOT support PUT or GET commands (no file transfer)</p>
+            <p className="text-red-700">✗ Cannot call third-party REST APIs during execution</p>
+            <p className="text-red-700">✗ Does NOT support username/password auth</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Session Role Resolution at Login" badge="Exam Trap" badgeColor="bg-red-100 text-red-700">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>Snowflake determines the current role using this priority:</p>
+            <p>1. Role <strong>specified at connection</strong> (must be granted to the user) → becomes current</p>
+            <p>2. If no role specified, <strong>user's default role</strong> is used</p>
+            <p>3. If no default role exists, <strong>PUBLIC</strong> is used as fallback — login does NOT fail</p>
+            <p className="text-red-700 font-semibold">If a specified role is NOT granted to the user → connection error (login fails)</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Cancelling a Long-Running Query">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p><strong>Fastest:</strong> Return to the worksheet and click ABORT on the query</p>
+            <p>Activity view → cancel works but adds navigation steps</p>
+            <p className="text-red-700">SUSPEND warehouse = cancels ALL queries on it (affects other users!)</p>
+            <p className="text-red-700">AUTO_SUSPEND = 0 means NEVER suspend — does not abort anything</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Worksheet Sharing (Snowsight)">
+          <CompareTable
+            headers={['Permission', 'What it Grants']}
+            rows={[
+              ['View only', 'See worksheet contents (SQL text)'],
+              ['Edit + View = TRUE', 'See contents + modify SQL — but cannot RUN unless they have the role + privileges that own referenced objects'],
+              ['Run', 'Execute queries (still gated by underlying object grants for the user\'s role)'],
+            ]}
+          />
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-2 text-xs">
+            <p className="font-bold text-amber-700">Sharing a worksheet does NOT grant access to underlying tables</p>
+            <p className="text-slate-700 mt-1">The recipient still needs their own role and privileges. They can read the SQL but might not be able to run it.</p>
+          </div>
+        </Accordion>
+
         <Traps list={[
           '"SnowCD executes queries" = FALSE — it only tests connectivity',
           '"SQL API uses username/password" = FALSE — OAuth or JWT only',
+          '"SQL API supports GET/PUT for file transfer" = FALSE — no file commands',
+          '"SQL API can call third-party APIs during execution" = FALSE — Snowflake-only',
           '"PUT works from Snowsight" = FALSE — requires local filesystem (SnowSQL or drivers)',
+          '"If specified role is not granted, login uses PUBLIC" = FALSE — login fails',
+          '"Sharing a worksheet shares the underlying table data" = FALSE — recipient still needs their own grants',
+          '"Suspending the warehouse is the fastest way to cancel ONE query" = FALSE — kills all queries on it',
         ]} />
       </div>
     ),
@@ -170,6 +221,36 @@ const D1_SECTIONS = [
               ['Iceberg Table', 'Customer-managed storage (S3/Azure/GCS). Snowflake-managed catalog = full read/write. External catalog (e.g., Glue) = read-only + limited features.'],
             ]}
           />
+        </Accordion>
+
+        <Accordion title="External Tables — Allowed Operations" badge="Exam Trap" badgeColor="bg-red-100 text-red-700">
+          <CompareTable
+            headers={['Operation', 'Allowed?']}
+            rows={[
+              ['SELECT / JOIN with other tables', 'YES — they participate in queries normally'],
+              ['ALTER (refresh, add/drop columns, rename)', 'YES'],
+              ['INSERT / UPDATE / DELETE / MERGE', 'NO — read-only'],
+              ['Time Travel', 'NO'],
+              ['Cloning (standalone or via DB clone)', 'NO — excluded'],
+            ]}
+          />
+        </Accordion>
+
+        <Accordion title="Cloning Snapshot Timing" badge="Exam Fave" badgeColor="bg-blue-100 text-blue-700">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>The clone captures data at the moment <strong>the CREATE ... CLONE statement is INITIATED</strong> — not when it completes</p>
+            <p>Concurrent DML on the source AFTER initiation does NOT appear in the clone</p>
+            <p>This is why cloning a 10 TB table is fast — it's a metadata snapshot, not a data copy</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="MV Invalidation by Schema Changes">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs space-y-1">
+            <p>A materialized view becomes <strong>invalid</strong> if base table columns it references are <strong>dropped</strong></p>
+            <p>Renaming a base table column may also invalidate the MV</p>
+            <p>Check status: <code className="bg-slate-100 px-1 rounded">SHOW MATERIALIZED VIEWS</code> → invalid_reason column</p>
+            <p>Recovery: drop and recreate the MV after schema changes</p>
+          </div>
         </Accordion>
 
         <Accordion title="Account Identifier Formats" badge="Exam Fave" badgeColor="bg-blue-100 text-blue-700">
@@ -361,6 +442,20 @@ const D1_SECTIONS = [
           />
         </Accordion>
 
+        <Accordion title="UDF Languages — Snowpark API vs Native">
+          <CompareTable
+            headers={['How Created', 'Languages Supported']}
+            rows={[
+              ['Snowpark API (programmatic)', 'Python, Java, Scala'],
+              ['Native CREATE FUNCTION (SQL)', 'SQL, Python, Java, Scala, JavaScript'],
+            ]}
+          />
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-2 text-xs">
+            <p className="font-bold text-amber-700">Trap: JavaScript UDFs exist — but NOT through Snowpark</p>
+            <p className="text-slate-700 mt-1">JavaScript is supported via raw SQL (CREATE FUNCTION ... LANGUAGE JAVASCRIPT) but NOT through the Snowpark API. Snowpark = Python/Java/Scala only.</p>
+          </div>
+        </Accordion>
+
         <Accordion title="Snowpark Container Services (SPCS)">
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
             <p>Run containerized workloads (LLMs, custom APIs, data apps) directly in Snowflake</p>
@@ -492,6 +587,34 @@ const D2_SECTIONS = [
           </div>
         </Accordion>
 
+        <Accordion title="Masking Policy Structure" badge="Memorize" badgeColor="bg-violet-100 text-violet-700">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>A masking policy is composed of:</p>
+            <p>✓ <strong>Single data type</strong> (input and output type must match)</p>
+            <p>✓ <strong>One or more conditions</strong> (CASE/WHEN logic on role context)</p>
+            <p>✓ <strong>One or more masking functions</strong> applied based on conditions</p>
+            <p className="text-red-700 mt-2">A single policy CANNOT cover multiple data types — need separate policies per type</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Privilege Grant Order for Read-Only Table Access" badge="Memorize" badgeColor="bg-violet-100 text-violet-700">
+          <CodeSnip>{`-- Correct order to give a custom role read access to a table\nGRANT USAGE   ON DATABASE  my_db        TO ROLE my_role;\nGRANT USAGE   ON SCHEMA    my_db.my_sch TO ROLE my_role;\nGRANT SELECT  ON TABLE     my_db.my_sch.my_tbl TO ROLE my_role;`}</CodeSnip>
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-2 text-xs">
+            <p className="font-bold text-amber-700">Hierarchy walk: Database → Schema → Table</p>
+            <p className="text-slate-700 mt-1">USAGE on the container is required to "see" the next level. The TABLE-level privilege itself is <strong>SELECT</strong> for read (NOT USAGE, NOT OPERATE).</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Continuous Data Protection (CDP) Cost Optimization">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>CDP cost = Time Travel storage + Fail-safe storage</p>
+            <p><strong>High-churn dimension tables:</strong> use TRANSIENT tables to skip Fail-safe (saves 7 days of storage charges)</p>
+            <p>Periodically copy/clone transient → permanent for backup if needed</p>
+            <p className="text-red-700">Temporary tables are session-scoped — not a substitute for transient</p>
+            <p className="text-red-700">Extending Time Travel (e.g., 30 days) INCREASES CDP costs significantly on high-churn tables</p>
+          </div>
+        </Accordion>
+
         <Accordion title="Row Access Policies" badge="Enterprise+" badgeColor="bg-violet-100 text-violet-700">
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
             <p>Filter rows based on querying role</p>
@@ -553,11 +676,19 @@ const D2_SECTIONS = [
         <Accordion title="Resource Monitors" defaultOpen>
           <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 text-xs space-y-1">
             <p><strong>Only ACCOUNTADMIN can CREATE</strong> — non-delegable</p>
-            <p>MONITOR privilege = view usage. MODIFY privilege = change properties.</p>
+            <p><strong>MONITOR + MODIFY are the LEAST privileges</strong> needed to view AND modify resource monitors (less than OWNERSHIP)</p>
             <p>Only track <strong>user-managed warehouse</strong> credits — NOT serverless</p>
             <p>Serverless (Snowpipe, auto-clustering, MVs, SOS) requires <strong>budgets</strong></p>
             <p>TRIGGERS clause in ALTER <strong>replaces</strong> all existing triggers (not additive)</p>
           </div>
+          <CompareTable
+            headers={['Privilege', 'Allows']}
+            rows={[
+              ['MONITOR', 'View resource monitor and its usage'],
+              ['MODIFY', 'Change credit quotas, triggers, frequency'],
+              ['OWNERSHIP', 'Everything above + transfer/drop'],
+            ]}
+          />
         </Accordion>
 
         <Accordion title="ACCOUNT_USAGE vs INFORMATION_SCHEMA vs ORGANIZATION_USAGE">
@@ -673,6 +804,9 @@ const D3_SECTIONS = [
             rows={[
               ['METADATA$FILENAME', 'Source filename'],
               ['METADATA$FILE_ROW_NUMBER', 'Row number within the source file'],
+              ['METADATA$FILE_CONTENT_KEY', 'MD5 hash of the staged file content'],
+              ['METADATA$FILE_LAST_MODIFIED', 'Last-modified timestamp of the staged file'],
+              ['METADATA$START_SCAN_TIME', 'Timestamp when COPY/Snowpipe started scanning this file (additional load tracking)'],
             ]}
           />
         </Accordion>
@@ -836,6 +970,41 @@ const D4_SECTIONS = [
           />
         </Accordion>
 
+        <Accordion title="Spilling — Two Recommended Fixes" badge="Memorize" badgeColor="bg-amber-100 text-amber-700">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>1. <strong>Use a larger warehouse</strong> — more memory per node (Scale UP)</p>
+            <p>2. <strong>Fetch only required columns</strong> — avoid SELECT * to reduce data volume in memory</p>
+            <p className="text-red-700 mt-2">Multi-cluster (Scale OUT) does NOT fix spilling — only adds concurrency for queueing</p>
+            <p className="text-red-700">Cloning the table does NOT help</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="Pruning Analysis in Query Profile" badge="Memorize" badgeColor="bg-amber-100 text-amber-700">
+          <CompareTable
+            headers={['Attribute', 'What it Tells You']}
+            rows={[
+              ['Partitions Total', 'Total micro-partitions in the table'],
+              ['Partitions Scanned', 'How many were actually read'],
+              ['Ratio (Scanned / Total)', 'High ratio = poor pruning. Low ratio = effective pruning.'],
+              ['Bytes Scanned', 'Raw data volume read after pruning'],
+              ['% Scanned from Cache', 'Hit rate on warehouse SSD cache (separate from pruning)'],
+            ]}
+          />
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-2 text-xs">
+            <p className="font-bold text-amber-700">Bad pruning indicator</p>
+            <p className="text-slate-700 mt-1">If "Partitions Scanned" is close to "Partitions Total," your filter columns aren't aligned with clustering. Consider clustering keys, rewrite filters, or add SOS for selective lookups.</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="DML That Triggers Re-clustering">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>Automatic re-clustering is triggered by data-modifying operations:</p>
+            <p>✓ <strong>INSERT</strong>, <strong>UPDATE</strong>, <strong>DELETE</strong>, <strong>MERGE</strong>, <strong>COPY INTO</strong> (load)</p>
+            <p className="text-red-700 mt-2">Read-only operations do NOT trigger re-clustering: SELECT, SHOW, DESCRIBE, USE</p>
+            <p>Re-clustering uses serverless credits — billed separately, not against your warehouse</p>
+          </div>
+        </Accordion>
+
         <Accordion title="ACCOUNT_USAGE Performance Views">
           <CompareTable
             headers={['View', 'Purpose']}
@@ -855,6 +1024,9 @@ const D4_SECTIONS = [
           '"Spilling to local = critical" = FALSE — moderate; REMOTE spilling is critical',
           '"Exploding joins = out of memory" = FALSE — means Cartesian product from bad join condition',
           '"Queuing = scale up" = FALSE — queuing = scale OUT with multi-cluster',
+          '"Multi-cluster fixes spilling" = FALSE — Scale UP fixes spilling; Scale OUT fixes queueing',
+          '"SELECT triggers re-clustering" = FALSE — only DML (INSERT/UPDATE/DELETE/MERGE/COPY)',
+          '"Bytes Scanned attribute alone proves bad pruning" = FALSE — compare Partitions Scanned vs Partitions Total',
         ]} />
       </div>
     ),
@@ -1268,6 +1440,31 @@ const D5_SECTIONS = [
             <p>Consumer installs in their own account</p>
             <p>Runs with <strong>consumer's compute</strong> — NOT provider's</p>
           </div>
+        </Accordion>
+
+        <Accordion title="Data Clean Rooms" badge="Memorize" badgeColor="bg-rose-100 text-rose-700">
+          <CompareTable
+            headers={['Provider Tasks', 'Consumer Tasks']}
+            rows={[
+              ['Create the clean room', 'Install (join) the clean room'],
+              ['Add (link) data to the clean room', 'Link their own data to the clean room'],
+              ['Define allowed templates / queries', 'Run analyses using approved templates'],
+              ['Manage privacy rules', 'View aggregated/permitted results'],
+            ]}
+          />
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-2 text-xs">
+            <p className="font-bold text-amber-700">Privacy guarantee</p>
+            <p className="text-slate-700 mt-1">Both parties contribute data, but neither sees the other's raw rows — analysis runs on combined data with controlled output (typically aggregated).</p>
+          </div>
+        </Accordion>
+
+        <Accordion title="SYSTEM$IS_LISTING_PURCHASED — Marketplace Gating">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+            <p>System function used inside <strong>secure views or secure UDFs</strong> on shared data</p>
+            <p>Returns TRUE if the consumer has purchased the Marketplace listing (paid)</p>
+            <p>Lets providers gate premium data behind a paywall while keeping a single share</p>
+          </div>
+          <CodeSnip>{`-- Show full data only to paying consumers; redact otherwise\nCREATE SECURE VIEW premium_data AS\nSELECT\n  customer_id,\n  CASE WHEN SYSTEM$IS_LISTING_PURCHASED('LISTING_ID')\n    THEN sensitive_value\n    ELSE NULL\n  END AS sensitive_value\nFROM raw_data;`}</CodeSnip>
         </Accordion>
 
         <Accordion title="Numbers to Memorize" badge="Cheat Sheet" badgeColor="bg-rose-100 text-rose-700">
