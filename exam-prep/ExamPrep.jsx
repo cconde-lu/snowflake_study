@@ -29,6 +29,17 @@ const DIFFICULTY_COLORS = {
   hard:   'bg-red-100 text-red-700',
 };
 
+// ── Multi-select helpers ──────────────────────────────────────────────────────
+const isCorrect = (q, userAnswer) => {
+  if (q.multi) {
+    if (!Array.isArray(userAnswer) || !Array.isArray(q.answers)) return false;
+    const a = [...userAnswer].sort();
+    const e = [...q.answers].sort();
+    return a.length === e.length && a.every((v, i) => v === e[i]);
+  }
+  return userAnswer === q.answer;
+};
+
 const formatTime = (seconds) => {
   const m = Math.floor(seconds / 60).toString().padStart(2, '0');
   const s = (seconds % 60).toString().padStart(2, '0');
@@ -173,22 +184,38 @@ const ExamEngine = ({ dayIndex, onBack }) => {
   );
 
   const q = questions[current];
-  const picked = answers[q?.id];
-  const totalAnswered = Object.keys(answers).length;
+  const picked = answers[q?.id];  // string (single) or string[] (multi)
+  const totalAnswered = Object.keys(answers).filter(id => {
+    const a = answers[id];
+    return Array.isArray(a) ? a.length > 0 : !!a;
+  }).length;
 
-  const score = questions.filter(q => answers[q.id] === q.answer).length;
+  const score = questions.filter(q => isCorrect(q, answers[q.id])).length;
   const pct   = Math.round((score / questions.length) * 100);
 
   const byDomain = questions.reduce((acc, q) => {
     if (!acc[q.domain]) acc[q.domain] = { total: 0, correct: 0 };
     acc[q.domain].total++;
-    if (answers[q.id] === q.answer) acc[q.domain].correct++;
+    if (isCorrect(q, answers[q.id])) acc[q.domain].correct++;
     return acc;
   }, {});
 
   const handleAnswer = (opt) => {
     if (phase !== 'running') return;
-    setAnswers(a => ({ ...a, [q.id]: opt }));
+    if (q.multi) {
+      setAnswers(a => {
+        const cur = Array.isArray(a[q.id]) ? a[q.id] : [];
+        if (cur.includes(opt)) {
+          return { ...a, [q.id]: cur.filter(o => o !== opt) };
+        }
+        if (cur.length < (q.answers?.length ?? 2)) {
+          return { ...a, [q.id]: [...cur, opt] };
+        }
+        return a; // at selection limit, ignore extra clicks
+      });
+    } else {
+      setAnswers(a => ({ ...a, [q.id]: opt }));
+    }
     setShowExp(false);
   };
 
@@ -229,7 +256,7 @@ const ExamEngine = ({ dayIndex, onBack }) => {
           'The exam clock starts when you click "Start Exam" and cannot be paused.',
           `All ${meta.totalQuestions} questions must be answered before submitting — flag uncertain answers for review.`,
           'After submitting (or when time runs out), you\'ll see your full score breakdown by domain.',
-          'Each question has exactly one correct answer.',
+          'Most questions have one correct answer. Questions marked "Select 2" require selecting all correct options — partial credit is NOT given.',
           'Passing the real exam requires approximately 80% (scaled scoring).',
         ].map((t, i) => (
           <div key={i} className="flex items-start gap-2 text-sm text-slate-600">
@@ -307,8 +334,15 @@ const ExamEngine = ({ dayIndex, onBack }) => {
         <div className="space-y-4">
           {questions.map((q, i) => {
             const userAnswer = answers[q.id];
-            const correct = userAnswer === q.answer;
+            const correct = isCorrect(q, userAnswer);
+            const hasAnswer = Array.isArray(userAnswer) ? userAnswer.length > 0 : !!userAnswer;
             const c = DOMAIN_COLORS[q.domain];
+            const correctLabel = q.multi
+              ? q.answers?.join(' | ')
+              : q.answer;
+            const userLabel = Array.isArray(userAnswer)
+              ? userAnswer.join(' | ')
+              : userAnswer;
             return (
               <div key={q.id} className={`rounded-xl border p-4 text-sm ${correct ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
                 <div className="flex items-start gap-2 mb-2">
@@ -319,16 +353,17 @@ const ExamEngine = ({ dayIndex, onBack }) => {
                     <div className="flex flex-wrap gap-1.5 mb-1">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${c.badge}`}>D{q.domain} {DOMAIN_LABELS[q.domain]}</span>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${DIFFICULTY_COLORS[q.difficulty]}`}>{q.difficulty}</span>
+                      {q.multi && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">Select {q.answers?.length}</span>}
                     </div>
                     <p className="font-medium text-slate-700 mb-2">{i + 1}. {q.q}</p>
-                    {!correct && userAnswer && (
-                      <p className="text-red-600 text-xs mb-1">✗ Your answer: <span className="font-semibold">{userAnswer}</span></p>
+                    {!correct && hasAnswer && (
+                      <p className="text-red-600 text-xs mb-1">✗ Your answer: <span className="font-semibold">{userLabel}</span></p>
                     )}
-                    {!correct && !userAnswer && (
+                    {!correct && !hasAnswer && (
                       <p className="text-slate-400 text-xs mb-1 italic">Not answered</p>
                     )}
                     <p className={`text-xs font-semibold mb-1 ${correct ? 'text-emerald-700' : 'text-red-700'}`}>
-                      ✓ Correct: {q.answer}
+                      ✓ Correct: {correctLabel}
                     </p>
                     <p className="text-xs text-slate-500 italic">{q.exp}</p>
                   </div>
@@ -373,6 +408,11 @@ const ExamEngine = ({ dayIndex, onBack }) => {
           <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${DIFFICULTY_COLORS[q.difficulty]}`}>
             {q.difficulty}
           </span>
+          {q.multi && (
+            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-100 text-purple-700">
+              Select {q.answers?.length}
+            </span>
+          )}
           <span className="text-[10px] text-slate-400 font-medium ml-auto">{q.topic}</span>
           <button onClick={toggleFlag}
             className={`text-[10px] font-bold px-2.5 py-1 rounded-full border transition-all ${
@@ -382,11 +422,19 @@ const ExamEngine = ({ dayIndex, onBack }) => {
           </button>
         </div>
 
-        <p className="text-base font-semibold text-slate-800 leading-relaxed mb-5">{q.q}</p>
+        <p className="text-base font-semibold text-slate-800 leading-relaxed mb-2">{q.q}</p>
+        {q.multi && (
+          <p className="text-xs text-purple-600 font-semibold mb-4">
+            Choose {q.answers?.length} answers — {Array.isArray(picked) ? picked.length : 0}/{q.answers?.length} selected
+          </p>
+        )}
+        {!q.multi && <div className="mb-3" />}
 
         <div className="space-y-2">
           {q.options.map(opt => {
-            const isPicked = picked === opt;
+            const isPicked = q.multi
+              ? Array.isArray(picked) && picked.includes(opt)
+              : picked === opt;
             return (
               <button key={opt} onClick={() => handleAnswer(opt)}
                 className={`w-full text-left px-4 py-3 rounded-xl border text-sm transition-all flex items-center gap-3 ${
@@ -394,19 +442,29 @@ const ExamEngine = ({ dayIndex, onBack }) => {
                     ? 'border-cyan-400 bg-cyan-50 text-cyan-900 font-semibold'
                     : 'border-slate-200 bg-white hover:border-cyan-300 hover:bg-cyan-50/50 text-slate-700'
                 }`}>
-                <span className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
-                  isPicked ? 'border-cyan-500 bg-cyan-500' : 'border-slate-300'
-                }`}>
-                  {isPicked && <span className="w-2 h-2 bg-white rounded-full"></span>}
-                </span>
+                {q.multi ? (
+                  // Checkbox indicator for multi-select
+                  <span className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center ${
+                    isPicked ? 'border-cyan-500 bg-cyan-500' : 'border-slate-300'
+                  }`}>
+                    {isPicked && <span className="text-white text-[10px] font-black leading-none">✓</span>}
+                  </span>
+                ) : (
+                  // Radio indicator for single-select
+                  <span className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                    isPicked ? 'border-cyan-500 bg-cyan-500' : 'border-slate-300'
+                  }`}>
+                    {isPicked && <span className="w-2 h-2 bg-white rounded-full"></span>}
+                  </span>
+                )}
                 <span className="flex-1">{opt}</span>
               </button>
             );
           })}
         </div>
 
-        {/* Show explanation toggle (available mid-exam to see hint — real exam mode doesn't show answers) */}
-        {picked && (
+        {/* Explanation peek */}
+        {(q.multi ? Array.isArray(picked) && picked.length > 0 : !!picked) && (
           <div className="mt-3">
             <button onClick={() => setShowExp(v => !v)}
               className="text-xs text-slate-400 hover:text-slate-600 underline">
@@ -414,7 +472,9 @@ const ExamEngine = ({ dayIndex, onBack }) => {
             </button>
             {showExp && (
               <div className="mt-2 p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 italic">
-                <span className="font-bold text-emerald-700 not-italic">Correct: {q.answer}</span>
+                <span className="font-bold text-emerald-700 not-italic">
+                  Correct: {q.multi ? q.answers?.join(' AND ') : q.answer}
+                </span>
                 <br />{q.exp}
               </div>
             )}
@@ -453,7 +513,7 @@ const ExamEngine = ({ dayIndex, onBack }) => {
                   ? 'bg-cyan-600 border-cyan-600 text-white'
                   : flagged[qq.id]
                   ? 'bg-amber-100 border-amber-300 text-amber-700'
-                  : answers[qq.id]
+                  : (Array.isArray(answers[qq.id]) ? answers[qq.id].length > 0 : !!answers[qq.id])
                   ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
                   : 'bg-white border-slate-200 text-slate-500 hover:border-slate-400'
               }`}>
